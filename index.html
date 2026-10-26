@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoFa kinematics lab · ENG-654 Project 1A</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="index.html"><span class="brand-mark">1A</span>
+    <span><strong class="brand-name">GoFa kinematics lab</strong><span class="brand-subtitle">EPFL · ENG-654 · Project 1A</span></span></a>
+  <nav class="top-links"><a href="docs/project_1A.pdf" target="_blank" rel="noopener">Assignment PDF</a><a href="https://epfl-lasa.github.io/eng-654/" target="_blank" rel="noopener">Course ↗</a></nav>
+</header>
+<main class="home">
+  <h1>Branch-resolved singularity analysis and path placement on ABB GoFa</h1>
+  <p class="lead">One interactive page per part of the assignment. Each page opens on its own 3D view or map with a single side panel, and tabs keep one topic visible at a time.</p>
+  <div class="question">Given access to all IK solutions, how can the global kinematic structure of ABB GoFa be used to predict where a Cartesian task can be executed continuously?</div>
+  <div class="grid-cards" id="cards"></div>
+  <p class="note" style="margin-top:28px">Everything runs in the browser from the course URDF and meshes. The numerical checks behind steps 1–4 also run headless: <code>node tests/check.mjs</code>.</p>
+</main>
+<script type="module">
+  import { STEPS } from './js/ui.js';
+  const blurbs = {
+    1: 'Joint axes, offsets, limits, base and tool frames from the URDF; standard D–H table; screw axes and M.',
+    2: 'URDF, D–H and PoE forward kinematics compared live, on thousands of random configurations, and against the supplied solver.',
+    3: 'Screw-based Jacobian with geometric column view, the course subchain Jacobian ³J₅, conditioning and finite-difference checks.',
+    4: 'Full-robot conditioning over shoulder × elbow, with singular curves classified by the joint motion they lose.',
+    5: 'Run the supplied solver, validate every configuration with our FK, unwrap periodic angles, apply limits and track persistent branches.',
+    6: 'One closed full-pose contour and its two-dimensional placement family, for at least two tool orientations.',
+    7: 'Branch-resolved feasibility maps, with failures split into no IK, joint limit, continuity and singularity margin.',
+    8: 'Nearest-configuration continuation against branch-aware global search, with representative trajectories.',
+  };
+  document.getElementById('cards').innerHTML = STEPS.map((s) => `
+    <${s.soon ? 'div' : 'a'} class="pcard ${s.soon ? 'soon' : ''}" ${s.soon ? '' : `href="pages/${s.file}"`}>
+      <span class="n">${s.n}</span><h2>${s.title}</h2><p>${blurbs[s.n]}</p>
+      <span class="tag">${s.soon ? 'Next stage: needs the IK pipeline' : 'Open →'}</span>
+    </${s.soon ? 'div' : 'a'}>`).join('');
+</script>
+</body>
+</html>

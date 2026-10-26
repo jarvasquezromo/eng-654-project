@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>2 · FK validation · GoFa lab</title>
+  <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+  <script defer src="../vendor/katex/katex.min.js"></script>
+  <script defer src="../vendor/katex/contrib/auto-render.min.js"></script>
+  <script type="importmap">{"imports":{"three":"../vendor/three/build/three.module.js","three/addons/controls/OrbitControls.js":"../vendor/three/controls/OrbitControls.js"}}</script>
+  <script type="module" src="../js/pages/p2-fk.js"></script>
+</head>
+<body data-step="2">
+<main class="work">
+  <section class="view" id="view">
+    <div class="view-tools">
+      <div class="group" id="views"><button data-v="iso">Iso</button><button data-v="front">Front</button><button data-v="side">Side</button><button data-v="top">Top</button></div>
+      <div class="group" id="layers"><button data-l="ghost" class="on">Ghost robot</button><button data-l="chain" class="on">All D–H frames</button></div>
+    </div>
+    <div class="view-status" id="status">Loading GoFa meshes…</div>
+    <div class="view-legend"><span>Tool frames: <b>large</b> = URDF · <b>medium</b> = D–H · <b>small</b> = PoE, all at the same pose</span></div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="eyebrow">Step 2 · Forward kinematics</div>
+      <h1>Cross-validate URDF, D–H and PoE</h1>
+      <p>Three independent ways to compute the tool pose. They must agree to machine precision on any configuration.</p>
+    </div>
+    <div class="tabs"><button data-tab="live" class="active">Live compare</button><button data-tab="batch">Batch test</button><button data-tab="ik">Solver check</button><button data-tab="method">Method</button></div>
+    <div class="panel-body">
+      <div data-pane="live">
+        <div id="sliders"></div>
+        <div class="row" style="margin-top:10px"><button id="rand">Random q</button><button id="home">Home</button></div>
+        <div class="label">Tool position from each model (m)</div>
+        <div id="live"></div>
+        <div class="label">Pairwise differences</div>
+        <div id="liveErr"></div>
+      </div>
+
+      <div data-pane="batch">
+        <p class="note">Sample configurations uniformly inside the joint limits and record the worst position and orientation disagreement for each pair of models.</p>
+        <div class="row"><label>Samples <input type="number" id="n" value="5000" min="100" max="100000" step="100" style="width:90px"></label><button class="primary" id="run">Run test</button></div>
+        <div id="batchOut" style="margin-top:12px"></div>
+        <div id="hist"></div>
+      </div>
+
+      <div data-pane="ik">
+        <p class="note">The supplied solver's example (<code>pose.json</code>: the zero-joint tool pose) returns 8 configurations. Each one is pushed through <em>our</em> PoE and D–H models and compared with the requested pose. This also confirms that our <code>tool0</code> frame and quaternion convention \([w,x,y,z]\) match the solver.</p>
+        <div id="ikOut" class="scroll-x"></div>
+      </div>
+
+      <div data-pane="method">
+        <div class="card"><h3>URDF chain</h3><p class="sub">Parsed at runtime from <code>crb15000_5_95.urdf</code>: \(T = \prod_j T(\text{xyz}_j)\,R_{\text{rpy}}(\text{rpy}_j)\,\text{Rot}(\hat a_j, q_j)\), ending with the fixed flange and tool0 joints.</p></div>
+        <div class="card"><h3>Standard D–H</h3><p class="sub">\({}^0T_6 = \prod_{i=1}^6 R_z(q_i+\theta_{i,0})\,T_z(d_i)\,T_x(a_i)\,R_x(\alpha_i)\) with the table from Step 1. It shares no code with the URDF path.</p></div>
+        <div class="card"><h3>Product of exponentials</h3><p class="sub">\(T = e^{[S_1]q_1}\cdots e^{[S_6]q_6}M\), with each exponential from the closed-form \(SE(3)\) Rodrigues formula.</p></div>
+        <div class="card"><h3>Error measures</h3><p class="sub">Position \(\|p_A-p_B\|\). Orientation \(\angle(R_A^\top R_B)\) computed with \(\operatorname{atan2}\) so it stays accurate near zero (an \(\arccos\) formula bottoms out at about \(10^{-8}\) rad).</p></div>
+      </div>
+    </div>
+    <div class="panel-foot"></div>
+  </aside>
+</main>
+</body>
+</html>

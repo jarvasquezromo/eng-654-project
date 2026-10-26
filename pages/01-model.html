@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>1 · Kinematic model · GoFa lab</title>
+  <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+  <script defer src="../vendor/katex/katex.min.js"></script>
+  <script defer src="../vendor/katex/contrib/auto-render.min.js"></script>
+  <script type="importmap">{"imports":{"three":"../vendor/three/build/three.module.js","three/addons/controls/OrbitControls.js":"../vendor/three/controls/OrbitControls.js"}}</script>
+  <script type="module" src="../js/pages/p1-model.js"></script>
+</head>
+<body data-step="1">
+<main class="work">
+  <section class="view" id="view">
+    <div class="view-tools">
+      <div class="group" id="views"><button data-v="iso">Iso</button><button data-v="front">Front</button><button data-v="side">Side</button><button data-v="top">Top</button></div>
+      <div class="group" id="layers">
+        <button data-l="urdf">URDF frames</button><button data-l="dh" class="on">D–H frames</button><button data-l="screw" class="on">Screw axes</button><button data-l="ghost">Ghost robot</button>
+      </div>
+    </div>
+    <div class="view-status" id="status">Loading GoFa meshes…</div>
+    <div class="view-legend"><span><span class="dot" style="background:#e53935"></span>x</span><span><span class="dot" style="background:#2e9d4f"></span>y</span><span><span class="dot" style="background:#2f6fe4"></span>z</span><span><span class="dot" style="background:#d4a017"></span>joint screw axis</span><span>drag: orbit · right-drag: pan · wheel: zoom</span></div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="eyebrow">Step 1 · Model</div>
+      <h1>Reconstruct GoFa from the URDF</h1>
+      <p>Read the joint axes, offsets, limits, base and tool frames, then express the same robot as a standard D–H table and as screw axes.</p>
+    </div>
+    <div class="tabs"><button data-tab="pose" class="active">Pose</button><button data-tab="urdf">URDF</button><button data-tab="dh">D–H</button><button data-tab="screw">Screws</button></div>
+    <div class="panel-body">
+      <div data-pane="pose">
+        <div class="label">Joint angles</div>
+        <div id="sliders"></div>
+        <div class="row" style="margin-top:10px"><button id="home">Home q = 0</button><button id="ref">Reference q</button><button id="rand">Random</button></div>
+        <div class="label">Tool frame tool0 in base</div>
+        <div id="toolpose"></div>
+        <div class="callout">The D–H frames (bold triads) are drawn from the D–H table and the gold lines from the PoE screw axes. Move any joint: they stay glued to the URDF meshes because all three models describe the same robot.</div>
+      </div>
+
+      <div data-pane="urdf">
+        <div class="label">Revolute joints (file order)</div>
+        <div class="scroll-x" id="urdfTable"></div>
+        <div class="label">Fixed frames</div>
+        <div class="card">
+          <h3>Base frame</h3>
+          <p class="sub"><code>base_link</code> = <code>base</code> (identity). Joint 1 sits 0.265 m above it on the vertical axis.</p>
+          <h3>Tool frame</h3>
+          <p class="sub"><code>link_6 → flange</code> is identity and <code>flange → tool0</code> is a pure rotation \(R_y(\pi/2)\). So tool0's z-axis points along joint 6's axis and its x-axis along −z of the base at home.</p>
+        </div>
+        <div class="card">
+          <h3>What the axes say about the geometry</h3>
+          <p class="sub">Axes 2 and 3 are parallel (both \(y\)); axes 4 and 6 are parallel at home but 0.080 m apart; axes 4 and 5 intersect. The wrist is therefore <b>not spherical</b>: axis 6 misses the intersection of axes 4 and 5. This offset is why the course's clean shoulder × elbow × wrist factorisation does not carry over directly.</p>
+        </div>
+      </div>
+
+      <div data-pane="dh">
+        <p class="note">Standard convention \(\;{}^{i-1}T_i = R_z(\theta_i)\,T_z(d_i)\,T_x(a_i)\,R_x(\alpha_i)\), with \(\theta_i = q_i + \theta_{i,0}\). Each \(z_{i-1}\) is chosen in the same direction as the URDF axis of joint \(i\), so joint signs match the URDF and the supplied IK solver.</p>
+        <div id="dhTable"></div>
+        <div class="label">Why each row</div>
+        <div id="dhWhy" class="note"></div>
+        <div class="callout">Frame 6 coincides with <code>tool0</code>. Turn on both <b>URDF frames</b> and <b>D–H frames</b>: the last triads overlap exactly.</div>
+      </div>
+
+      <div data-pane="screw">
+        <p class="note">Space-frame screws at \(q = 0\): unit direction \(\omega_i\), a point \(r_i\) on the axis, and \(v_i = -\omega_i \times r_i\). Then \(T(q) = e^{[S_1]q_1}\cdots e^{[S_6]q_6} M\).</p>
+        <div class="scroll-x" id="screwTable"></div>
+        <div class="label">Home configuration \(M\)</div>
+        <div id="mTable"></div>
+        <div class="callout">The screws are read directly from the joint lines at home. Step 2 checks the PoE model against the URDF numerically.</div>
+      </div>
+    </div>
+    <div class="panel-foot"></div>
+  </aside>
+</main>
+</body>
+</html>

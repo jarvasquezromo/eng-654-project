@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3 · Jacobian · GoFa lab</title>
+  <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+  <script defer src="../vendor/katex/katex.min.js"></script>
+  <script defer src="../vendor/katex/contrib/auto-render.min.js"></script>
+  <script type="importmap">{"imports":{"three":"../vendor/three/build/three.module.js","three/addons/controls/OrbitControls.js":"../vendor/three/controls/OrbitControls.js"}}</script>
+  <script type="module" src="../js/pages/p3-jacobian.js"></script>
+</head>
+<body data-step="3">
+<main class="work">
+  <section class="view" id="view">
+    <div class="view-tools">
+      <div class="group" id="views"><button data-v="iso">Iso</button><button data-v="front">Front</button><button data-v="side">Side</button><button data-v="top">Top</button></div>
+      <div class="group" id="layers"><button data-l="axes" class="on">All axes</button><button data-l="ghost" class="on">Ghost robot</button></div>
+    </div>
+    <div class="view-status" id="status">Loading GoFa meshes…</div>
+    <div class="view-legend"><span><span class="dot" style="background:#ff0000"></span>selected joint axis</span><span><span class="dot" style="background:#2f6fe4"></span>linear part at reference point</span><span><span class="dot" style="background:#9b51e0"></span>angular part ω</span></div>
+    <details class="dock" open><summary>Joint angles</summary><div class="dock-body"><div id="sliders"></div>
+      <div class="row" style="margin-top:8px"><button id="ref">Reference</button><button id="home">Home</button><button id="rand">Random</button></div></div></details>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="eyebrow">Step 3 · Differential kinematics</div>
+      <h1>Screw Jacobian and ³J₅</h1>
+      <p>Each column is one joint's screw axis seen from a reference point. Pick a column to see it on the robot.</p>
+    </div>
+    <div class="tabs"><button data-tab="cols" class="active">Columns</button><button data-tab="j35">³J₅</button><button data-tab="cond">Conditioning</button><button data-tab="verify">Verify</button></div>
+    <div class="panel-body">
+      <div data-pane="cols">
+        <div class="colpick" id="colpick"></div>
+        <p class="note">\(J_i = \begin{bmatrix}\omega_i\times(p-r_i)\\ \omega_i\end{bmatrix}\): angular velocity \(\omega_i\) along the current joint axis, and the linear velocity it induces at the tool point \(p\) (lever arm \(p-r_i\)). Built from the space Jacobian \(J_s=[\mathrm{Ad}_{T_{1..i-1}}S_i]\).</p>
+        <div class="scroll-x" id="jTool"></div>
+        <div class="card" style="margin-top:12px"><h3 id="colTitle"></h3><div id="colInfo" class="sub"></div></div>
+      </div>
+
+      <div data-pane="j35">
+        <div class="row" style="margin-bottom:8px"><label class="toggle"><input type="checkbox" id="showO5" checked> Show O₅ and frame {3}</label></div>
+        <p class="note">Course definition: the same joint screws, taken about the D–H origin \(O_5\) and resolved in frame {3}: \({}^3J_5=\operatorname{diag}(R_{03}^\top,R_{03}^\top)\,{}^0J_{O_5}\). Shaded: the upper-right 3×3 block, which is zero for a spherical wrist.</p>
+        <div class="scroll-x" id="j35"></div>
+        <div class="card" style="margin-top:12px"><h3>Reading the blocks for GoFa</h3><div class="sub" id="j35Info"></div></div>
+      </div>
+
+      <div data-pane="cond">
+        <p class="note">Linear rows are divided by a characteristic length \(L\) so metres and radians are comparable. Then \(\kappa=\sigma_{\max}/\sigma_{\min}\) and \(w=\prod\sigma_i\).</p>
+        <label class="slider" style="grid-template-columns:70px 1fr 58px"><span>L (m)</span><input type="range" id="L" min="0.1" max="1.5" step="0.01" value="0.5"><output id="Lout">0.50</output></label>
+        <div class="tiles" id="tiles" style="margin-top:12px"></div>
+        <div class="label">Singular values of the scaled Jacobian</div>
+        <div id="sigmas"></div>
+        <div class="callout">\(\det J\) is the same for every reference point and every basis: \(\det({}^3J_5)=\det({}^0J_{\text{tool}})\). Changing the point multiplies by a unit block-triangular matrix, and changing the basis by \(\operatorname{diag}(R^\top,R^\top)\). Singularity is a property of the configuration, not of where you measure.</div>
+      </div>
+
+      <div data-pane="verify">
+        <p class="note">Each column is compared with a central finite difference of the PoE forward kinematics (\(h=10^{-6}\)): \(\dot p\) for the linear rows and \(\mathrm{vee}(\dot R R^\top)\) for the angular rows.</p>
+        <div class="scroll-x" id="fd"></div>
+        <div class="row" style="margin-top:12px"><button class="primary" id="batch">Test 1000 random configurations</button></div>
+        <div id="batchOut" style="margin-top:10px"></div>
+      </div>
+    </div>
+    <div class="panel-foot"></div>
+  </aside>
+</main>
+</body>
+</html>

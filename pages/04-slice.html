@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>4 · (q2, q3) slice · GoFa lab</title>
+  <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+  <script defer src="../vendor/katex/katex.min.js"></script>
+  <script defer src="../vendor/katex/contrib/auto-render.min.js"></script>
+  <script type="importmap">{"imports":{"three":"../vendor/three/build/three.module.js","three/addons/controls/OrbitControls.js":"../vendor/three/controls/OrbitControls.js"}}</script>
+  <script type="module" src="../js/pages/p4-slice.js"></script>
+</head>
+<body data-step="4">
+<main class="work">
+  <section class="view" id="view">
+    <div class="heat" id="heat"><canvas id="canvas"></canvas></div>
+    <div class="view-tools">
+      <div class="group" id="metric">
+        <button data-m="invkappa" class="on">1/κ</button><button data-m="sigmamin">σ<sub>min</sub></button><button data-m="det">sign · |det J|</button>
+      </div>
+      <div class="group" id="overlays"><button data-o="curves" class="on">Singular curves</button><button data-o="elbow" class="on">Elbow prediction</button></div>
+    </div>
+    <div class="inset" id="inset"><span class="cap" id="insetCap">Click the map to pose the robot</span></div>
+    <div class="progress" id="progress" hidden>Computing…</div>
+    <div class="view-legend" id="legend"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="eyebrow">Step 4 · Singularity</div>
+      <h1>Conditioning across a (q₂, q₃) slice</h1>
+      <p>Fix the other joints at a regular reference configuration, sweep shoulder and elbow, and evaluate the full 6×6 Jacobian everywhere.</p>
+    </div>
+    <div class="tabs"><button data-tab="slice" class="active">Slice</button><button data-tab="inspect">Inspect</button><button data-tab="explain">Explain</button><button data-tab="method">Method</button></div>
+    <div class="panel-body">
+      <div data-pane="slice">
+        <div class="label">Fixed joints of the slice</div>
+        <div id="sliders"></div>
+        <p class="note" style="margin-top:6px">q₁ and q₆ are omitted on purpose: \(\det J\) and every singular value are independent of them. Base yaw and flange roll only rotate the whole picture (checked in <b>Method</b>).</p>
+        <div class="row" style="margin-top:8px"><button id="ref">Reference wrist</button><button id="flat">q₄ = q₅ = 0</button></div>
+        <div class="label">Map</div>
+        <label class="slider" style="grid-template-columns:90px 1fr 50px"><span>Resolution</span><input type="range" id="res" min="60" max="300" step="20" value="180"><output id="resOut">180</output></label>
+        <label class="slider" style="grid-template-columns:90px 1fr 50px"><span>L (m)</span><input type="range" id="L" min="0.1" max="1.5" step="0.05" value="0.5"><output id="Lout">0.50</output></label>
+        <div class="tiles" id="summary" style="margin-top:10px"></div>
+      </div>
+
+      <div data-pane="inspect">
+        <p class="note">Click (or drag) on the map. The inset robot takes that configuration.</p>
+        <div class="tiles" id="probeTiles"></div>
+        <div class="label">Lost motion: right singular vector of σ<sub>min</sub></div>
+        <div id="nullvec"></div>
+        <p class="note" id="nullNote" style="margin-top:8px"></p>
+      </div>
+
+      <div data-pane="explain">
+        <div class="card"><h3><span class="dot" style="background:#ff0000"></span>Elbow curve: \(q_3 \approx -77^\circ\)</h3>
+          <p class="sub">The lost motion lives almost entirely in \((q_2,q_3)\): the lever arms of joints 2 and 3 to the wrist line up. For the positional subchain at \(O_4\) (intersection of axes 4 and 5) this happens exactly at
+          \[q_3^* = -\tfrac{\pi}{2} + \operatorname{atan2}(0.110,\,0.470) = -76.83^\circ\]
+          (dashed line). The other root, \(103.17^\circ\), and its \(-256.83^\circ\) twin fall <b>outside</b> the joint-3 limits \([-225^\circ, 85^\circ]\), so GoFa has a single reachable elbow separator. The full-robot curve sits near \(q_3^*\) but moves with \(q_4,q_5\) (about \(-100^\circ\) to \(-55^\circ\)) because of the 0.080 m wrist offset. Try the wrist sliders.</p></div>
+        <div class="card"><h3><span class="dot" style="background:#2f6fe4"></span>Shoulder curves</h3>
+          <p class="sub">Here the lost motion is dominated by \(q_1\), typically paired with an equal and opposite \(q_4\) or \(q_6\). The base axis and a wrist roll axis become (nearly) aligned through the tool, so turning the base can be undone by the wrist. This is the offset-wrist counterpart of the wrist centre crossing the base axis. Inspect a blue point to see the pairing.</p></div>
+        <div class="card"><h3><span class="dot" style="background:#d4a017"></span>Wrist-coupled curves</h3>
+          <p class="sub">The lost motion is mostly \(q_4\)–\(q_6\), mixed with \(q_1\). For a spherical wrist this is the clean \(\sin q_5 = 0\) set. For GoFa, axes 4 and 6 can be parallel without being collinear, so \(q_5=0\) alone is <b>not</b> singular: at home, \(\kappa \approx 35\). The wrist singularity becomes a curve that depends on \(q_2,q_3\).</p></div>
+        <div class="callout">The colours come from the dominant block of the null vector at each sign change of \(\det J\). The classification is computed, not assumed. Check any point in <b>Inspect</b>.</div>
+      </div>
+
+      <div data-pane="method">
+        <div class="card"><h3>What is evaluated</h3><p class="sub">For each grid cell, the full tool Jacobian \(J(q)\) from the screw model (Step 3). Linear rows are scaled by \(1/L\), then the singular values come from a Jacobi eigen-solve of \(J^\top J\).</p></div>
+        <div class="card"><h3>Singular curves</h3><p class="sub">Cells where \(\operatorname{sign}\det J\) changes against a neighbour. A sign change is a robust zero crossing, unlike thresholding \(\sigma_{\min}\). Each is classified by its right singular vector \(v_6\), using the energy in \(\{q_1\}\), \(\{q_2,q_3\}\) and \(\{q_4,q_5,q_6\}\).</p></div>
+        <div class="card"><h3>Invariance check</h3><p class="sub" id="inv">Running…</p></div>
+      </div>
+    </div>
+    <div class="panel-foot"></div>
+  </aside>
+</main>
+</body>
+</html>
