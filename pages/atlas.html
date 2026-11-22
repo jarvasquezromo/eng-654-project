@@ -18,6 +18,8 @@
     <div class="view-tools">
       <div class="group mode"><a href="04-slice.html">Joint slice</a><a href="04-plane.html">Task-space plane</a><a class="on" href="atlas.html">Topology atlas</a></div>
       <div class="group" id="apBtns"><button data-ap="down" class="on">Tool down</button><button data-ap="up">Tool up</button></div>
+      <div class="group" id="planeBtns"><button data-pl="rz" class="on">ρ, z</button><button data-pl="xy">xy</button><button data-pl="xz">xz</button><button data-pl="yz">yz</button></div>
+      <label class="offset" id="offBox" hidden><span id="offName">z =</span><input type="range" id="off" step="0.01"><output id="offOut"></output></label>
       <div class="group"><button id="limBtn">Joint limits</button><button id="regBtn" class="on">IK-count regions</button></div>
     </div>
     <div class="twin" id="twin">
@@ -25,7 +27,7 @@
         <div class="pane-head"><b>Joint space · four sheets</b><small>det J on each sheet, zero set in black</small></div>
         <div class="quad"><canvas id="sA"></canvas><canvas id="sB"></canvas><canvas id="sU"></canvas><canvas id="sD"></canvas></div>
       </div>
-      <div class="pane"><div class="pane-head"><b>Workspace section</b><small>ρ ≥ 0 · rotate about z for the full workspace</small></div><canvas id="wc"></canvas></div>
+      <div class="pane"><div class="pane-head"><b id="wTitle">Workspace section</b><small id="wSub">ρ ≥ 0 · rotate about z for the full workspace</small></div><canvas id="wc"></canvas></div>
     </div>
     <div class="view-legend" id="legend"></div>
   </section>
@@ -46,6 +48,7 @@
       <div data-pane="red">
         <div class="card"><h3>Why the tool axis is vertical</h3><p class="sub">With \(z_6 = \mp\hat z\), turning the base by \(q_1\) only spins the tool about its own (vertical) axis, which \(q_6\) undoes. So the IK count and the singularities depend only on \(\rho = \sqrt{x^2+y^2}\) and \(z\): the same axisymmetry the lecture uses for its 3R atlas. (For a tilted tool this symmetry is lost; use the task-space plane view for that.)</p></div>
         <div class="card"><h3>Four sheets</h3><p class="sub">The tool axis is \(z_6 = z_5\), and \(z_5\) is always perpendicular to axis 5 (\(z_4\)). So \(z_6 = v\) needs \(v \perp z_4\). With \(q_1 = 0\), \(z_4 = (\sin q_4 \sin s,\ \cos q_4,\ \sin q_4 \cos s)\), \(s = q_2 + q_3\), hence \(v\cdot z_4 = \mp\sin q_4\cos s = 0\). The solutions form four 2-D sheets: <b>A</b> \(q_4 = 0\) and <b>B</b> \(q_4 = 180^\circ\) (plotted over \(q_2, q_3\)); <b>U</b> forearm up, \(s = -90^\circ\), and <b>D</b> forearm down, \(s = +90^\circ\) (plotted over \(q_2, q_4\); there \(q_5 \in \{0, 180^\circ\}\), axes 4 and 6 parallel). On each sheet \(q_5\) is unique and \(q_6\) absorbs \(q_1\). Sheets meet along lines (A ∩ U is \(q_4 = 0,\ s = -90^\circ\), and so on). Every solver solution was checked to lie on one sheet.</p></div>
+        <div class="card"><h3>Planes</h3><p class="sub">Because the count depends only on \((\rho, z)\), the critical set in 3-D is the critical curves rotated about the base axis. A plane cuts those surfaces exactly: on <b>xy</b> at height \(h\) they become circles of radius \(\rho\) wherever a critical curve crosses \(z = h\); on <b>xz</b> at \(y = c\) (or <b>yz</b> at \(x = c\)) each critical point maps to \(x = \pm\sqrt{\rho^2 - c^2}\). Region counts on a plane are full IK solves at a point of each region.</p></div>
         <div class="card"><h3>Singular set</h3><p class="sub">\(D = \det J\) of the full 6×6 Jacobian (it does not depend on \(q_1\) or \(q_6\)), evaluated on each sheet. Its zero curves are the singular configurations; their images are the critical curves. Every preimage of a target on either sheet is one full IK solution, checked against the solver: up to 16 for general orientations, here up to the count shown in each region.</p></div>
         <div class="card"><h3>Joint limits</h3><p class="sub">q₁, q₂, q₄, q₅ have a full turn and q₆ more, so only q₃ removes configurations: q₃ ∈ (85°, 135°) (mod 360°) is outside [−225°, 85°]. With “Joint limits” on, that band is hatched (a horizontal band on A and B, a vertical band in q₂ on U and D, since q₃ = s − q₂ there) and counts only use feasible solutions.</p></div>
       </div>

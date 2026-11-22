@@ -104,12 +104,14 @@ export function buildGofaAtlas(approach = 'down', n = 181) {
 
 // Full-pose IK for the target (ρ, z) on the meridian y = 0, tool vertical. Each solution is
 // tagged with its sheet id and its plot coordinates (a, b) there.
-export function solveTarget(approach, rho, z, { yaw = 0 } = {}) {
+export function solveTarget(approach, rho, z, opts = {}) { return solvePoint(approach, [rho, 0, z], opts); }
+// Same, for any 3-D tool point (the count only depends on ρ and z)
+export function solvePoint(approach, p, { yaw = 0 } = {}) {
   const v = APPROACH[approach].v;
   // tool frame: z6 = v, x6 = horizontal direction set by yaw
   const x6 = [Math.cos(yaw), Math.sin(yaw), 0], z6 = v, y6 = cross(z6, x6);
   const R = [[x6[0], y6[0], z6[0]], [x6[1], y6[1], z6[1]], [x6[2], y6[2], z6[2]]];
-  return solveIK(homog(R, [rho, 0, z])).map((s) => ({ q: s.q, within: s.within, ...sheetOf(s.q), det: detJ(s.q) }));
+  return solveIK(homog(R, p)).map((s) => ({ q: s.q, within: s.within, ...sheetOf(s.q), det: detJ(s.q) }));
 }
 
 // q3 joint-limit band on the (−π, π] axis: allowed are q3 ∈ [−π, 85°] ∪ [135°, π] (= −225° … −180°)
