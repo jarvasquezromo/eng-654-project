@@ -128,13 +128,13 @@ function solve() {
   const list = shown();
   state.sel = Math.min(state.sel, Math.max(0, list.length - 1));
   const [x, y, z] = state.target, rho = Math.hypot(x, y);
-  $('#ikTiles').innerHTML = [['tool point (m)', `${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}`], ['ρ (m)', rho.toFixed(3)], ['IK solutions', state.limits ? `${list.length} in limits / ${state.sols.length}` : state.sols.length]]
+  $('#ikTiles').innerHTML = [['tool point (m)', `${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}`], ['ρ (m)', rho.toFixed(3)], ['IK solutions', state.sols.continuum ? `∞ (${state.sols.filter((s) => s.family).length} families)` : state.limits ? `${list.length} in limits / ${state.sols.length}` : state.sols.length]]
     .map(([k, x]) => `<div class="tile"><small>${k}</small><b>${x}</b></div>`).join('');
   $('#ikChips').innerHTML = list.map((s, i) => `<button class="chip ${i === state.sel ? 'on' : ''}" data-i="${i}" style="color:${IK_COLORS[i % 16]};${i === state.sel ? `background:${IK_COLORS[i % 16]}` : ''}">IK ${i + 1}</button>`).join('') || '<span class="note">No solution: the target is outside the workspace for this tool.</span>';
   $$('#ikChips .chip').forEach((c) => (c.onclick = () => { state.sel = Number(c.dataset.i); solve(); }));
   $('#ikTable').innerHTML = list.length ? `<table class="starts"><thead><tr><th>IK</th><th>sheet</th>${[1, 2, 3, 4, 5, 6].map((i) => `<th>q${'₁₂₃₄₅₆'[i - 1]}</th>`).join('')}<th>det J</th></tr></thead><tbody>${
     list.map((s, i) => `<tr class="${i === state.sel ? 'sel' : ''} ${s.within ? '' : 'out'}"><td><span class="dot" style="background:${IK_COLORS[i % 16]}"></span>${i + 1}</td><td><span class="dot" style="background:${SHEET_COLORS[s.id] || NUM_COLORS[s.id]}"></span>${exact() ? s.id : `q₅ ${s.id === '+' ? '≥' : '<'} 0`}</td>${s.q.map((x) => `<td>${deg(x)}</td>`).join('')}<td>${fmt(s.det, 3)}</td></tr>`).join('')
-  }</tbody></table>` : '';
+  }</tbody></table>${state.sols.continuum ? '<p class="note" style="margin-top:8px">Singular pose: the IK set contains continuous families (q₁ and q₆ can turn together without moving the tool), so there are infinitely many solutions. Each family is shown by one member.</p>' : ''}` : '';
   paintAll(); showRobot(); legend();
 }
 
@@ -402,7 +402,7 @@ function paintWNum() {
   const filled = (k) => Math.floor(k / G.nu) < N.rows || N.done;
   for (let j = 0; j < G.nv; j++) for (let i = 0; i < G.nu; i++) {
     const k = j * G.nu + i;
-    ctx.fillStyle = state.regions ? COUNT_FILL[Math.min(cnt[k], 16)] : '#f7f9fc';
+    ctx.fillStyle = state.regions ? (cnt[k] === 255 ? '#141414' : COUNT_FILL[Math.min(cnt[k], 16)]) : '#f7f9fc';
     ctx.fillRect(X(i), Y(j), px + 0.6, px + 0.6);
   }
   // critical curves ≈ where the IK count changes between neighbouring points
@@ -436,7 +436,7 @@ function paintWNum() {
         if (d > bd) { bd = d; best = t; }
       }
       ctx.fillStyle = cnt[s0] ? '#1f3f73' : '#9a9a9a';
-      ctx.fillText(String(cnt[s0]), X(best % G.nu) + px / 2, Y((best / G.nu) | 0) + px / 2 + 4);
+      ctx.fillText(cnt[s0] === 255 ? '∞' : String(cnt[s0]), X(best % G.nu) + px / 2, Y((best / G.nu) | 0) + px / 2 + 4);
     }
     ctx.textAlign = 'left';
   }

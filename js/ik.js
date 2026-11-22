@@ -163,14 +163,25 @@ function poseErr(T, q) {
 
 /**
  * All IK solutions for a tool0 pose T (4×4).
- * Returns [{ q, within, branch: { shoulder, elbow, wrist }, label, position_error, rotation_error }].
+ * Returns [{ q, within, branch: { shoulder, elbow, wrist }, label, position_error, rotation_error, family }].
+ * Generic poses have isolated solutions (at most 16 for a 6R arm). If the solution set contains a
+ * continuous family (a singular pose, e.g. tool point on the base axis with a vertical tool), the
+ * array gets .continuum = true and each family is represented by one configuration with family: true.
  * Options: samples (q6 grid, default 90), tol (FK acceptance, default 1e-7).
  */
 export function solveIK(T, { samples = 90, tol = 1e-7 } = {}) {
   const W = wristGeometry(T), sols = [];
   for (const shoulder of [1, -1]) for (const elbow of [1, -1]) {
     const branch = { shoulder, elbow };
-    const roots = rootsOf((q6) => residual(W, q6, branch).f, samples);
+    const fn = (q6) => residual(W, q6, branch).f;
+    // Positive-dimensional case: if f(q6) ≡ 0 on this branch (e.g. tool point on the base axis with the
+    // tool axis vertical: q1 and q6 can turn together), there is a continuous family, not isolated
+    // roots. Report it once instead of returning one "solution" per sample.
+    let flat = 0, finite = 0;
+    for (let k = 0; k < 24; k++) { const v = fn(-Math.PI + 0.0137 + (TWO_PI * k) / 24); if (Number.isFinite(v)) { finite++; if (Math.abs(v) < 1e-9) flat++; } }
+    const family = finite >= 4 && flat >= 0.75 * finite;
+    if (family) sols.continuum = true;
+    const roots = family ? [-Math.PI + 0.0137] : rootsOf(fn, samples);
     for (const q6 of roots) {
       const { arm, g } = residual(W, q6, branch);
       if (!arm) continue;
@@ -182,7 +193,8 @@ export function solveIK(T, { samples = 90, tol = 1e-7 } = {}) {
       // drop duplicates (roots found twice at a sample boundary)
       if (sols.some((s) => s.q.every((x, i) => Math.abs(wrap(x - q[i])) < 1e-7))) continue;
       const wrist = q[4] >= 0 ? 1 : -1;
-      sols.push({
+      if (family && sols.some((x) => x.family && x.branch.shoulder === shoulder && x.branch.elbow === elbow)) continue;
+      sols.push({ family,
         q, within, branch: { shoulder, elbow, wrist },
         label: branchLabel({ shoulder, elbow, wrist }),
         position_error: err.position, rotation_error: err.rotation,

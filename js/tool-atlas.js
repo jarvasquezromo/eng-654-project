@@ -9,7 +9,9 @@ import { detJ } from './gofa-atlas.js';
 export function solveTool(R, len, p) {
   const z = [R[0][2], R[1][2], R[2][2]];
   const T = homog(R, [p[0] - len * z[0], p[1] - len * z[1], p[2] - len * z[2]]);
-  return solveIK(T).map((s) => ({ q: s.q, within: s.within, w: s.q[4] >= 0 ? 1 : -1, det: detJ(s.q) }));
+  const S = solveIK(T), out = S.map((s) => ({ q: s.q, within: s.within, family: s.family, w: s.q[4] >= 0 ? 1 : -1, det: detJ(s.q) }));
+  out.continuum = !!S.continuum;
+  return out;
 }
 
 // Plane grid: point(a, b) = origin + (u0 + (a + ½)·step)·eu + (v0 + (b + ½)·step)·ev
@@ -26,7 +28,7 @@ export function computeRows(R, len, G, rows) {
     const all = new Uint8Array(G.nu), inl = new Uint8Array(G.nu), sols = [];
     for (let i = 0; i < G.nu; i++) {
       const S = solveTool(R, len, planePoint(G, i, j));
-      all[i] = S.length; inl[i] = S.filter((s) => s.within).length;
+      all[i] = S.continuum ? 255 : S.length; inl[i] = S.continuum ? 255 : S.filter((s) => s.within).length; // 255 = continuous family
       for (const s of S) sols.push(j * G.nu + i, s.q[1], s.q[2], s.w, s.det, s.within ? 1 : 0);
     }
     out.push({ j, all, inl, sols: Float64Array.from(sols) });

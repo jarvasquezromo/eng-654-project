@@ -143,6 +143,17 @@ check(`JS IK round trip, fraction of q not recovered (${miss}/${NRT})`, miss / N
   check('Any-tool atlas: vertical tool counts equal the exact atlas (mismatches)', diff, 0);
 }
 
+// 5g. Isolated solutions never exceed 16; a tool point on the base axis with a vertical tool is a
+//     continuous family (the supplied solver reports an identically zero polynomial there)
+{
+  const { rpy } = await import('../js/math.js');
+  let maxN = 0;
+  for (let n = 0; n < 300; n++) maxN = Math.max(maxN, solveIK(poeFK(randQ())).length);
+  check(`At most 16 isolated IK solutions on random poses (max found ${maxN})`, Math.max(0, maxN - 16), 0);
+  const fam = solveIK(homog(rpy([0, Math.PI, 0]), [0, 0, 0.35 + 0.101]));
+  check('Tool point on the base axis, vertical tool: flagged as a continuous family', fam.continuum ? 0 : 1, 0);
+}
+
 // 6. Reference configuration is regular
 const c = conditioning(toolJacobian(REFERENCE_Q));
 console.log(`INFO  reference q: sigma_min=${c.sigmaMin.toFixed(4)} kappa=${c.kappa.toFixed(2)} det=${c.det.toExponential(3)}`);

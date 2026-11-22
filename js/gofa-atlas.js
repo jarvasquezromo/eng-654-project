@@ -111,7 +111,9 @@ export function solvePoint(approach, p, { yaw = 0 } = {}) {
   // tool frame: z6 = v, x6 = horizontal direction set by yaw
   const x6 = [Math.cos(yaw), Math.sin(yaw), 0], z6 = v, y6 = cross(z6, x6);
   const R = [[x6[0], y6[0], z6[0]], [x6[1], y6[1], z6[1]], [x6[2], y6[2], z6[2]]];
-  return solveIK(homog(R, p)).map((s) => ({ q: s.q, within: s.within, ...sheetOf(s.q), det: detJ(s.q) }));
+  const S = solveIK(homog(R, p)), out = S.map((s) => ({ q: s.q, within: s.within, family: s.family, ...sheetOf(s.q), det: detJ(s.q) }));
+  out.continuum = !!S.continuum;
+  return out;
 }
 
 // q3 joint-limit band on the (−π, π] axis: allowed are q3 ∈ [−π, 85°] ∪ [135°, π] (= −225° … −180°)
