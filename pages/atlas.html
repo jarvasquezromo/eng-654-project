@@ -3,63 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>3R atlas · singular curves and IK counts · GoFa lab</title>
+  <title>GoFa atlas · singular curves and IK counts · GoFa lab</title>
   <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../css/style.css">
   <link rel="stylesheet" href="../vendor/katex/katex.min.css">
   <script defer src="../vendor/katex/katex.min.js"></script>
   <script defer src="../vendor/katex/contrib/auto-render.min.js"></script>
   <script type="importmap">{"imports":{"three":"../vendor/three/build/three.module.js","three/addons/controls/OrbitControls.js":"../vendor/three/controls/OrbitControls.js"}}</script>
-  <script type="module" src="../js/pages/atlas.js"></script>
+  <script type="module" src="../js/pages/p4-atlas.js"></script>
 </head>
 <body data-step="4">
 <main class="work">
   <section class="view mapview" id="view">
     <div class="view-tools">
-      <div class="group mode"><a href="04-slice.html">Joint slice</a><a href="04-plane.html">Task-space plane</a><a class="on" href="atlas.html">3R atlas</a></div>
-      <div class="group" id="presetBtns"><button data-preset="zero">a₁ = 0</button><button data-preset="offset" class="on">a₁ = 1</button><button data-preset="gofa">GoFa arm</button></div>
-      <div class="group"><button id="regionsBtn" class="on">IK-count regions</button></div>
+      <div class="group mode"><a href="04-slice.html">Joint slice</a><a href="04-plane.html">Task-space plane</a><a class="on" href="atlas.html">Topology atlas</a></div>
+      <div class="group" id="apBtns"><button data-ap="down" class="on">Tool down</button><button data-ap="up">Tool up</button></div>
+      <div class="group"><button id="limBtn">Joint limits</button><button id="regBtn" class="on">IK-count regions</button></div>
     </div>
     <div class="twin" id="twin">
-      <div class="pane"><div class="pane-head"><b>Joint space</b><small>det Jₚ, zero set in black</small></div><canvas id="qc"></canvas></div>
+      <div class="pane stack">
+        <div class="pane-head"><b>Joint space · four sheets</b><small>det J on each sheet, zero set in black</small></div>
+        <div class="quad"><canvas id="sA"></canvas><canvas id="sB"></canvas><canvas id="sU"></canvas><canvas id="sD"></canvas></div>
+      </div>
       <div class="pane"><div class="pane-head"><b>Workspace section</b><small>ρ ≥ 0 · rotate about z for the full workspace</small></div><canvas id="wc"></canvas></div>
     </div>
     <div class="view-legend" id="legend"></div>
   </section>
   <aside class="panel">
     <div class="panel-head">
-      <div class="eyebrow">Extra · Lecture 06 atlas</div>
+      <div class="eyebrow">Step 4 · Topology of GoFa's IK</div>
       <h1>Singular curves and IK counts</h1>
-      <p>Left: \(D(q_2,q_3)=\det J_p\) and its zero set. Right: their images, the critical curves in \((\rho, z)\). Tap either plot to solve IK; numbered markers are the solutions.</p>
+      <p>The Lecture 06 atlas for GoFa itself: tool axis kept vertical, joint space on the four sheets of solutions, workspace on the meridian section \((\rho, z)\). Tap any plot to solve the full 6-joint IK.</p>
     </div>
-    <div class="tabs"><button data-tab="ik" class="active">IK</button><button data-tab="robot">D–H</button><button data-tab="cusps">Cusps</button><button data-tab="read">Read</button></div>
+    <div class="tabs"><button data-tab="ik" class="active">IK</button><button data-tab="red">Reduction</button><button data-tab="read">Read</button></div>
     <div class="panel-body">
       <div data-pane="ik">
         <div class="tiles" id="ikTiles"></div>
         <div class="row" id="ikChips" style="margin-bottom:10px"></div>
-        <canvas class="plot" id="stick" style="height:220px"></canvas>
+        <div class="robot3d" id="robot3d"><span class="cap" id="robotCap"></span></div>
         <div class="scroll-x" id="ikTable"></div>
       </div>
-      <div data-pane="robot">
-        <div class="formula" id="formula"></div>
-        <div class="numgrid">
-          <label class="num"><span>a₁ [m]</span><input type="number" data-p="a.0" step="0.01"></label><label class="num"><span>a₂ [m]</span><input type="number" data-p="a.1" step="0.01"></label><label class="num"><span>a₃ [m]</span><input type="number" data-p="a.2" step="0.01"></label><label class="num"><span>d₄ [m]</span><input type="number" data-p="d4" step="0.01"></label>
-          <label class="num"><span>d₁ [m]</span><input type="number" data-p="d.0" step="0.01"></label><label class="num"><span>d₂ [m]</span><input type="number" data-p="d.1" step="0.01"></label><label class="num"><span>d₃ [m]</span><input type="number" data-p="d.2" step="0.01"></label><span></span>
-          <label class="num"><span>α₁ [°]</span><input type="number" data-p="alpha.0" step="1"></label><label class="num"><span>α₂ [°]</span><input type="number" data-p="alpha.1" step="1"></label><label class="num"><span>α₃ [°]</span><input type="number" data-p="alpha.2" step="1"></label><span></span>
-          <label class="num"><span>θ₁,₀ [°]</span><input type="number" data-p="theta0.0" step="1"></label><label class="num"><span>θ₂,₀ [°]</span><input type="number" data-p="theta0.1" step="1"></label><label class="num"><span>θ₃,₀ [°]</span><input type="number" data-p="theta0.2" step="1"></label>
-        </div>
-        <p class="note">Standard D–H, \(^{i-1}T_i = R_z(q_i+\theta_{i,0})T_z(d_i)T_x(a_i)R_x(\alpha_i)\). The point is the frame-3 origin moved by d₄ along z₃ (d₄ = 0 for the lecture presets; 0.470 m gives GoFa's wrist point O₄). D does not depend on q₁ or d₁.</p>
-      </div>
-      <div data-pane="cusps">
-        <div id="cuspList"></div>
-        <p class="note">Found numerically: points of the singular curve where the kernel of the meridian map becomes tangent to the curve, confirmed by checking that the image chords on both sides leave the critical value in the same direction. For the offset preset they match the lecture's table (q₂, q₃) = (±129.78°, 66.39°), (±78.60°, −171.93°).</p>
+      <div data-pane="red">
+        <div class="card"><h3>Why the tool axis is vertical</h3><p class="sub">With \(z_6 = \mp\hat z\), turning the base by \(q_1\) only spins the tool about its own (vertical) axis, which \(q_6\) undoes. So the IK count and the singularities depend only on \(\rho = \sqrt{x^2+y^2}\) and \(z\): the same axisymmetry the lecture uses for its 3R atlas. (For a tilted tool this symmetry is lost; use the task-space plane view for that.)</p></div>
+        <div class="card"><h3>Four sheets</h3><p class="sub">The tool axis is \(z_6 = z_5\), and \(z_5\) is always perpendicular to axis 5 (\(z_4\)). So \(z_6 = v\) needs \(v \perp z_4\). With \(q_1 = 0\), \(z_4 = (\sin q_4 \sin s,\ \cos q_4,\ \sin q_4 \cos s)\), \(s = q_2 + q_3\), hence \(v\cdot z_4 = \mp\sin q_4\cos s = 0\). The solutions form four 2-D sheets: <b>A</b> \(q_4 = 0\) and <b>B</b> \(q_4 = 180^\circ\) (plotted over \(q_2, q_3\)); <b>U</b> forearm up, \(s = -90^\circ\), and <b>D</b> forearm down, \(s = +90^\circ\) (plotted over \(q_2, q_4\); there \(q_5 \in \{0, 180^\circ\}\), axes 4 and 6 parallel). On each sheet \(q_5\) is unique and \(q_6\) absorbs \(q_1\). Sheets meet along lines (A ∩ U is \(q_4 = 0,\ s = -90^\circ\), and so on). Every solver solution was checked to lie on one sheet.</p></div>
+        <div class="card"><h3>Singular set</h3><p class="sub">\(D = \det J\) of the full 6×6 Jacobian (it does not depend on \(q_1\) or \(q_6\)), evaluated on each sheet. Its zero curves are the singular configurations; their images are the critical curves. Every preimage of a target on either sheet is one full IK solution, checked against the solver: up to 16 for general orientations, here up to the count shown in each region.</p></div>
+        <div class="card"><h3>Joint limits</h3><p class="sub">q₁, q₂, q₄, q₅ have a full turn and q₆ more, so only q₃ removes configurations: q₃ ∈ (85°, 135°) (mod 360°) is outside [−225°, 85°]. With “Joint limits” on, that band is hatched (a horizontal band on A and B, a vertical band in q₂ on U and D, since q₃ = s − q₂ there) and counts only use feasible solutions.</p></div>
       </div>
       <div data-pane="read">
-        <div class="card"><h3>Regions and counts</h3><p class="sub">Critical curves split the section into regions; inside one region every target has the same number of regular IK solutions (shaded, with the count written in it). Crossing a fold curve, two solutions merge and disappear.</p></div>
-        <div class="card"><h3>Cusps</h3><p class="sub">At a cusp three solutions coalesce. A target path that loops around a cusp's critical value can bring the robot to a different IK solution without meeting a singularity: the robot is cuspidal. The a₁ = 0 preset has none; the a₁ = 1 preset has four.</p></div>
-        <div class="card"><h3>Link to GoFa</h3><p class="sub">The GoFa preset is GoFa's real position subchain (q₁, q₂, q₃ → wrist point O₄). It has intersecting first axes (a₁ = 0, d₂ = 0), no cusps and the classic 4/0 count: arm branches only change at the elbow and shoulder singularities, which is why the elbow line q₃* = −76.83° bounds the arm branches in Steps 4–7. Full GoFa has an offset wrist (a₅ = 0.080 m), so its 6-D IK (up to 16 solutions) is not wrist-partitioned and is not captured by this 3R picture.</p></div>
-        <div class="card"><h3>What is not included</h3><p class="sub">Joint limits and collisions are ignored here, as in the lecture atlas: every count is the number of mathematical (regular) solutions on the full torus. Steps 5–7 apply GoFa's limits.</p></div>
-        <div class="card"><h3>Joint path vs. workspace loop</h3><p class="sub">Tap two IK markers that share a colour region in joint space (same sign of D, same aspect): a path between them avoids singularities only if the robot is cuspidal.</p></div>
+        <div class="card"><h3>Regions and counts</h3><p class="sub">Inside a region between critical curves the number of IK solutions is constant. Crossing a fold, two solutions merge on a singular curve and disappear. This is what bounds the feasible placements in Step 7: a contour that crosses a fold loses the branch that was folding.</p></div>
+        <div class="card"><h3>Cusps</h3><p class="sub">Marked ◆ when found: three solutions coalesce there, and a target loop around a cusp can bring the robot to another IK solution without a singularity (cuspidal behaviour). The search checks every singular curve on both sheets.</p></div>
+        <div class="card"><h3>Aspects</h3><p class="sub">Red and blue areas are the two signs of det J. A path in one colour patch never meets a singularity. Solutions with the same sign on the same sheet may still be in different patches.</p></div>
       </div>
     </div>
     <div class="panel-foot"></div>

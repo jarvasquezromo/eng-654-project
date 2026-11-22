@@ -16,7 +16,7 @@ Each part of the assignment gets its own page: a 3D view (or map) plus one side 
 | 6 | Closed full-pose contour and its 2-D placement family, two tool orientations | ✅ |
 | 7 | Branch-resolved feasibility and failure maps (no IK / limit / discontinuity / margin), nearest vs branch-aware | ✅ |
 | 8 | Nearest vs branch-aware continuation | next |
-| + | 3R atlas from Lecture 06: det Jₚ, critical curves, IK counts, cusps (course presets and GoFa's arm) | ✅ |
+| 4+ | Topology atlas (Lecture 06 picture for GoFa): det J on the two wrist sheets, critical curves in (ρ, z), IK counts, cusps | ✅ |
 
 ## Open it
 
@@ -67,7 +67,7 @@ pages/                one HTML page per step
 js/math.js            linear algebra, SE(3), Jacobi eigen-solver
 js/gofa.js            URDF parser, D–H, PoE, Jacobians, conditioning
 js/ik.js              all-solutions IK in the browser (q6 sweep + closed-form arm)
-js/atlas.js           3R atlas maths: det Jp grid, zero set, critical curves, cusps, meridian IK
+js/gofa-atlas.js      topology atlas: wrist sheets for a vertical tool, det J zero set, critical curves, cusps
 js/tasks.js           contour, placement grid, candidates, branch tracking, both continuation strategies
 js/feas-worker.js     web worker that evaluates placements for the Step 7 maps (js/pool.js runs several)
 js/taskui.js, plot.js drawing helpers for Steps 5–7

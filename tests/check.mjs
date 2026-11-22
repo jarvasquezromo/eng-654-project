@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { parseURDF, urdfFK, dhFK, poeFK, toolJacobian, numericToolJacobian, J35, conditioning, LIMITS, REFERENCE_Q, poseError, SCREW_AXES, chainTo } from '../js/gofa.js';
 import { solveIK } from '../js/ik.js';
-import { maxAbsDiff, posOf, rotOf, quatToR, homog, rotDistance, norm, sub, cross, unit } from '../js/math.js';
+import { det, maxAbsDiff, posOf, rotOf, quatToR, homog, rotDistance, norm, sub, cross, unit } from '../js/math.js';
 
 const here = new URL('.', import.meta.url);
 const model = parseURDF(readFileSync(new URL('../assets/abb_gofa/crb15000_5_95.urdf', here), 'utf8'));
@@ -103,20 +103,24 @@ check(`JS IK round trip, fraction of q not recovered (${miss}/${NRT})`, miss / N
   check('Feasible nearest path: max joint step ≤ Δq_max (excess, rad)', Math.max(0, ...okStart.path.map((p) => p.step - (S.dqMax * Math.PI) / 180)), 0);
 }
 
-// 5e. 3R atlas (Lecture 06): determinant formula, cusps of the offset preset, IK count at the lecture target
+// 5e. Topology atlas reduction (tool vertical): every sheet point is a full IK solution on that sheet,
+//     and every solver solution lies on one of the four sheets
 {
-  const { PRESETS, detJp, buildAtlas, solveMeridian } = await import('../js/atlas.js');
-  let eD = 0;
-  for (let n = 0; n < 200; n++) {
-    const q2 = 6 * Math.random() - 3, q3 = 6 * Math.random() - 3, c2 = Math.cos(q2), c3 = Math.cos(q3), s3 = Math.sin(q3);
-    eD = Math.max(eD, Math.abs(detJp(PRESETS.offset, q2, q3) - 0.75 * (3 * c3 + 4) * (c2 * (c3 - 2 * s3) - s3)));
+  const { SHEETS, sheetConfig, solveTarget, meridianOf, detJ } = await import('../js/gofa-atlas.js');
+  let miss = 0, eZ = 0, eD = 0, off = 0;
+  const v = [0, 0, -1], N = 400;
+  for (let n = 0; n < N; n++) {
+    const sh = SHEETS[n % 4], a = 6 * Math.random() - 3, b = 6 * Math.random() - 3, q = sheetConfig(sh, a, b, v);
+    eZ = Math.max(eZ, Math.abs(poeFK(q)[2][2] + 1));
+    eD = Math.max(eD, Math.abs(detJ(q) - det(toolJacobian(q))));
+    const [r, z] = meridianOf(q), S = solveTarget('down', r, z);
+    if (Math.abs(detJ(q)) > 1e-4 && !S.some((x) => x.id === sh.id && Math.abs(wrapA(x.a - a)) < 1e-5 && Math.abs(wrapA(x.b - b)) < 1e-5)) miss++;
+    for (const x of S) { const qq = sheetConfig(SHEETS.find((t) => t.id === x.id), x.a, x.b, v); if ([1, 2, 3, 4].some((k) => Math.abs(wrapA(qq[k] - x.q[k])) > 1e-5)) off++; }
   }
-  check('Atlas det Jp = ¾(3c₃+4)[c₂(c₃−2s₃)−s₃] (offset preset)', eD, 1e-12);
-  const A = buildAtlas(PRESETS.offset), ref = [[-129.783, 66.385, 2.4656, -0.9987], [-78.596, -171.935, 1.3555, 0.4953], [78.596, -171.935, 1.3555, 1.5047], [129.783, 66.385, 2.4656, 2.9987]];
-  const eC = Math.max(...ref.map((r) => Math.min(...A.cusps.map((c) => Math.max(Math.abs(c.image[0] - r[2]), Math.abs(c.image[1] - r[3])))))) ;
-  check(`Atlas cusps match the lecture table (${A.cusps.length} found, max image error m)`, A.cusps.length === 4 ? eC : 1, 2e-3);
-  check('Atlas a₁ = 0 preset has no cusps', buildAtlas(PRESETS.zero).cusps.length, 0);
-  check('Atlas lecture target (1.498, 1.481) has 4 regular IK', Math.abs(solveMeridian(A, 1.498, 1.481).length - 4), 0);
+  check('Atlas sheets keep the tool vertical', eZ, 1e-12);
+  check('Atlas det J matches the screw Jacobian', eD, 1e-12);
+  check('Atlas: regular sheet points recovered by full IK on that sheet (misses)', miss, 0);
+  check('Atlas: every IK solution lies on one of the four sheets (off-sheet)', off, 0);
 }
 
 // 6. Reference configuration is regular
