@@ -50,13 +50,13 @@
         <div class="label">Orientation (tool z axis = approach)</div>
         <div class="seg wrap" id="toolSeg"><button data-t="down" class="on">Down −z</button><button data-t="up">Up +z</button><button data-t="fwd">Forward +x</button><button data-t="side">Side +y</button><button data-t="tilt">Down, tilted 45°</button><button data-t="custom">Custom</button></div>
         <div id="rpy" style="margin-top:8px">
-          <label class="slider wide"><span>roll (°)</span><input type="range" min="-180" max="180" step="1" data-k="0"><output></output></label>
-          <label class="slider wide"><span>pitch (°)</span><input type="range" min="-180" max="180" step="1" data-k="1"><output></output></label>
-          <label class="slider wide"><span>yaw (°)</span><input type="range" min="-180" max="180" step="1" data-k="2"><output></output></label>
+          <label class="slider wide num-row"><span>roll (°)</span><input type="range" min="-180" max="180" step="1" data-k="0"><input type="number" class="numbox" min="-180" max="180" step="1" data-kn="0" aria-label="roll in degrees"></label>
+          <label class="slider wide num-row"><span>pitch (°)</span><input type="range" min="-180" max="180" step="1" data-k="1"><input type="number" class="numbox" min="-180" max="180" step="1" data-kn="1" aria-label="pitch in degrees"></label>
+          <label class="slider wide num-row"><span>yaw (°)</span><input type="range" min="-180" max="180" step="1" data-k="2"><input type="number" class="numbox" min="-180" max="180" step="1" data-kn="2" aria-label="yaw in degrees"></label>
         </div>
         <p class="note">R = R<sub>z</sub>(yaw) R<sub>y</sub>(pitch) R<sub>x</sub>(roll), the same for every point of the plane.</p>
         <div class="label">Tool length (TCP offset along tool z)</div>
-        <label class="slider wide"><span>length</span><input type="range" id="len" min="0" max="0.30" step="0.01" value="0"><output id="lenOut">0.00 m</output></label>
+        <label class="slider wide num-row"><span>length (m)</span><input type="range" id="len" min="0" max="0.30" step="0.01" value="0"><input type="number" class="numbox" id="lenNum" min="0" max="0.30" step="0.01" aria-label="tool length in metres"></label>
         <p class="note">The map point is the TCP; the flange (tool0) sits ℓ behind it along the tool axis. det J does not depend on the reference point.</p>
         <div class="card" style="margin-top:10px"><p class="sub" id="toolNote"></p></div>
       </div>

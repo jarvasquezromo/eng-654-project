@@ -555,8 +555,7 @@ $('#wc').addEventListener('pointerdown', (e) => {
 function setTool(changedOrientation) {
   const v = vertical();
   $$('#apBtns button, #toolSeg button').forEach((b) => b.classList.toggle('on', b.dataset.t === state.tool.key));
-  $$('#rpy input').forEach((inp, k) => { inp.value = state.tool.rpy[k]; inp.nextElementSibling.textContent = `${state.tool.rpy[k]}°`; });
-  $('#lenOut').textContent = `${state.tool.len.toFixed(2)} m`; $('#len').value = state.tool.len;
+  syncToolUI();
   $('[data-pl="rz"]').disabled = !v;
   $('#toolNote').innerHTML = v ? `Tool axis vertical (${v}): exact atlas, all four sheets.` : 'Tool axis not vertical: the (ρ, z) symmetry is lost, so the plane is solved point by point (numerical map) and joint space shows where the plane’s IK solutions land, split by wrist sign.';
   state.regionData = null; state.num = null;
@@ -569,15 +568,30 @@ function setTool(changedOrientation) {
 $$('#apBtns button, #toolSeg button').forEach((b) => (b.onclick = () => {
   state.tool.key = b.dataset.t; if (TOOLS[b.dataset.t]) state.tool.rpy = TOOLS[b.dataset.t].slice(); setTool(true);
 }));
-$$('#rpy input').forEach((inp) => {
-  inp.oninput = () => { state.tool.rpy[Number(inp.dataset.k)] = Number(inp.value); inp.nextElementSibling.textContent = `${inp.value}°`; };
-  inp.onchange = () => { state.tool.key = Object.keys(TOOLS).find((k) => TOOLS[k].every((x, i) => x === state.tool.rpy[i])) || 'custom'; setTool(true); };
+// sliders and number boxes show the same values; a change in either recomputes
+function syncToolUI() {
+  $$('#apBtns button, #toolSeg button').forEach((b) => b.classList.toggle('on', b.dataset.t === state.tool.key));
+  $$('#rpy [data-k]').forEach((inp) => { inp.value = state.tool.rpy[Number(inp.dataset.k)]; });
+  $$('#rpy [data-kn]').forEach((inp) => { inp.value = state.tool.rpy[Number(inp.dataset.kn)]; });
+  $('#len').value = state.tool.len; $('#lenNum').value = state.tool.len.toFixed(2);
+}
+function commitRpy(k, v) {
+  if (!Number.isFinite(v)) return syncToolUI();
+  state.tool.rpy[k] = Math.max(-180, Math.min(180, Math.round(v)));
+  state.tool.key = Object.keys(TOOLS).find((t) => TOOLS[t].every((x, i) => x === state.tool.rpy[i])) || 'custom';
+  setTool(true);
+}
+$$('#rpy [data-k]').forEach((inp) => {
+  const k = Number(inp.dataset.k);
+  inp.oninput = () => { $(`#rpy [data-kn="${k}"]`).value = inp.value; };
+  inp.onchange = () => commitRpy(k, Number(inp.value));
 });
-$('#len').oninput = (e) => { $('#lenOut').textContent = `${Number(e.target.value).toFixed(2)} m`; };
-$('#len').onchange = (e) => { state.tool.len = Number(e.target.value); setTool(false); };
-$('#limBtn').onclick = () => { state.limits = !state.limits; $('#limBtn').classList.toggle('on', state.limits); state.sel = 0; solve(); };
-$('#regBtn').onclick = () => { state.regions = !state.regions; $('#regBtn').classList.toggle('on', state.regions); paintAll(); legend(); };
-new ResizeObserver(() => paintAll()).observe($('#twin'));
-
+$$('#rpy [data-kn]').forEach((inp) => { inp.onchange = () => commitRpy(Number(inp.dataset.kn), Number(inp.value)); });
+const commitLen = (v) => { if (!Number.isFinite(v)) return syncToolUI(); state.tool.len = Math.max(0, Math.min(0.3, Math.round(v * 100) / 100)); setTool(false); };
+$('#len').oninput = (e) => { $('#lenNum').value = Number(e.target.value).toFixed(2); };
+$('#len').onchange = (e) => commitLen(Number(e.target.value));
+$('#lenNum').onchange = (e) => commitLen(Number(e.target.value));
+syncToolUI();
+$('#toolNote').textContent = 'Tool axis vertical (down): exact atlas, all four sheets.';
 rebuild();
 renderMath();
