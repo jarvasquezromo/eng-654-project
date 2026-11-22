@@ -165,3 +165,58 @@ a.pcard:hover { border-color: var(--red); }
 .bar span.fill { display: block; height: 100%; }
 select.full { width: 100%; }
 @media (max-width: 980px) { .inset { width: 150px; height: 140px; top: 48px; } }
+
+/* ---------- map pages: mode switch, segmented controls, solution table */
+.view-tools { z-index: 3; }
+.inset, .view-legend, .progress { z-index: 2; }
+.view-tools .group a { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; font-size: 12px; font-weight: 500; text-decoration: none; color: var(--ink); background: #fff; }
+.view-tools .group a + a { border-left: 1px solid var(--line); }
+.view-tools .group a:hover { background: #f7f7f7; }
+.view-tools .group a.on { background: var(--red); color: #fff; }
+.view-tools select { min-height: 30px; font-size: 12px; max-width: 100%; }
+.slider.wide { grid-template-columns: 90px 1fr 50px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg.wrap { flex-wrap: wrap; }
+.seg button { flex: 1 1 auto; justify-content: center; border: 0; border-radius: 0; min-height: 32px; padding: 5px 8px; font-size: 12px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg + .slider, .seg + .note { margin-top: 8px; }
+table.sols td, table.sols th { padding: 4px 5px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+table.sols tr[data-i] { cursor: pointer; }
+table.sols tr[data-i]:hover td { background: #fafafa; }
+table.sols tr.sel td { background: #e9fbff; }
+table.sols tr.out td { color: #a0a0a0; text-decoration: line-through; }
+.heat canvas { touch-action: pan-y pinch-zoom; }
+
+/* ---------- phones and narrow screens */
+@media (max-width: 980px) {
+  .top { height: 52px; padding: 0 12px; }
+  .brand-name { font-size: 15px; }
+  .brand-subtitle { font-size: 9px; letter-spacing: 1px; }
+  .steps { padding: 8px 12px; }
+  .step { flex: 0 0 auto; min-width: 0; }
+  .step:not(.current) .step-t small { display: none; }
+  .panel-head { padding: 14px 14px 0; }
+  .panel-head h1 { font-size: 18px; }
+  .tabs { padding: 0 10px; overflow-x: auto; scrollbar-width: none; }
+  .tabs button { flex: 0 0 auto; }
+  .panel-body { padding: 14px 14px 18px; }
+  .panel-foot { padding: 10px 14px; }
+  .view-legend { display: flex; }
+  .view:not(.mapview) .view-legend { display: none; }
+  .home { padding: 20px 14px 40px; }
+  .home h1 { font-size: 23px; }
+  /* map pages: stack tools, map, legend and 3D inset instead of overlapping them */
+  .view.mapview { height: auto; display: flex; flex-direction: column; background: #fff; }
+  .mapview .view-tools { position: static; padding: 8px; }
+  .mapview .heat { position: relative; inset: auto; height: min(92vw, 62vh); }
+  .mapview .view-legend { position: static; margin: 6px 8px 0; }
+  .mapview .inset { position: relative; top: auto; right: auto; width: auto; height: 260px; margin: 8px; }
+  .mapview .progress { top: 40%; }
+  .slider { grid-template-columns: 26px 1fr 52px; }
+  .slider.wide { grid-template-columns: 78px 1fr 46px; }
+  input[type="range"] { min-height: 28px; }
+}
+@media (max-width: 980px) {
+  /* keep the joint dock inside the 3D view on phones (collapsed by default, scrolls when opened) */
+  .dock { position: absolute; left: 8px; right: 8px; bottom: 8px; width: auto; margin: 0; max-height: 55%; overflow: auto; z-index: 3; }
+}

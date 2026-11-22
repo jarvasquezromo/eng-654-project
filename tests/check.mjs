@@ -1,6 +1,7 @@
 // Numerical cross-checks: node tests/check.mjs
 import { readFileSync } from 'node:fs';
 import { parseURDF, urdfFK, dhFK, poeFK, toolJacobian, numericToolJacobian, J35, conditioning, LIMITS, REFERENCE_Q, poseError, SCREW_AXES, chainTo } from '../js/gofa.js';
+import { solveIK } from '../js/ik.js';
 import { maxAbsDiff, posOf, rotOf, quatToR, homog, rotDistance, norm, sub, cross, unit } from '../js/math.js';
 
 const here = new URL('.', import.meta.url);
@@ -67,6 +68,24 @@ const target = homog(quatToR([0.7071067811865476, 0, 0.7071067811865476, 0]), [0
 let eIK = 0;
 for (const s of ik.solutions) { const e = poseError(poeFK(s.q), target); eIK = Math.max(eIK, e.position, e.rotation); }
 check(`Supplied IK solutions (${ik.solutions.length}) reproduce target in our FK`, eIK, 1e-9);
+
+// 5b. Our browser IK finds every configuration the supplied solver returns for the example pose
+const wrapA = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
+const sameQ = (a, b) => Math.max(...a.map((v, i) => Math.abs(wrapA(v - b[i]))));
+const mine = solveIK(target);
+const eMatch = Math.max(...ik.solutions.map((s) => Math.min(...mine.map((m) => sameQ(m.q, s.q)))));
+check(`JS IK recovers all ${ik.solutions.length} supplied solutions (found ${mine.length})`, eMatch, 1e-8);
+
+// 5c. Round trip on random configurations: the generating q must be among the IK solutions
+let miss = 0, eRT = 0;
+const NRT = 1000;
+for (let n = 0; n < NRT; n++) {
+  const q = randQ(), T = poeFK(q), sols = solveIK(T);
+  sols.forEach((s) => { const e = poseError(poeFK(s.q), T); eRT = Math.max(eRT, e.position, e.rotation); });
+  if (!sols.some((s) => sameQ(s.q, q) < 1e-6)) miss++;
+}
+check('JS IK solutions reproduce the pose (max error)', eRT, 1e-7);
+check(`JS IK round trip, fraction of q not recovered (${miss}/${NRT})`, miss / NRT, 0.02);
 
 // 6. Reference configuration is regular
 const c = conditioning(toolJacobian(REFERENCE_Q));

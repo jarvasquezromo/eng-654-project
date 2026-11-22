@@ -1,5 +1,7 @@
 # ENG-654 Project 1A: GoFa kinematics lab
 
+**Live site: https://jarvasquezromo.github.io/eng-654-project/** (no install, works on phones).
+
 Interactive pages for **Project 1A: Branch-Resolved Singularity Analysis and Path Placement on ABB GoFa** (EPFL ENG-654, Kinematics-Grounded Motion Planning for Robots). The assignment is in [`docs/project_1A.pdf`](docs/project_1A.pdf).
 
 Each part of the assignment gets its own page: a 3D view (or map) plus one side panel with tabs, so only one topic is on screen at a time.
@@ -9,15 +11,17 @@ Each part of the assignment gets its own page: a 3D view (or map) plus one side 
 | 1 | Kinematic model: URDF → D–H table and screw axes | ✅ |
 | 2 | FK validation: URDF vs D–H vs PoE, plus a check against the supplied IK solver | ✅ |
 | 3 | Screw Jacobian, ³J₅, conditioning, finite-difference verification | ✅ |
-| 4 | (q₂, q₃) conditioning slice with classified singular curves | ✅ |
+| 4 | Conditioning slices: (q₂, q₃) with classified singular curves, and task-space xy / xz / yz planes at any offset, tool orientation and tool length | ✅ |
 | 5 | IK validation and persistent branches | next |
 | 6 | Closed contour and placement family | next |
 | 7 | Branch-resolved feasibility and failure maps | next |
 | 8 | Nearest vs branch-aware continuation | next |
 
-## Run locally
+## Open it
 
-The pages use ES modules, so serve the folder rather than opening the files directly:
+The site is served by GitHub Pages straight from `main` (root folder), so every push to `main` updates it within a minute or two. Nothing to build.
+
+To run it locally instead, serve the folder (the pages use ES modules, so opening the files directly does not work):
 
 ```sh
 python3 -m http.server 8000
@@ -43,6 +47,8 @@ Standard D–H, `Rz(θ) Tz(d) Tx(a) Rx(α)`, with `θi = qi + θi,0`. Frame 6 is
 | 5 | 0 | 0 | 0.080 | −π/2 |
 | 6 | π | 0.101 | 0 | 0 |
 
+The browser IK (`js/ik.js`) fixes q₆, solves the arm (q₁, q₂, q₃) in closed form for the frame-4 origin, and finds the q₆ roots of z₃ · z₄ = 0 per arm branch. On 400 random poses it matched the supplied `crb15000-ik` solver on 2947 configurations, missed 3 (all at the elbow reach boundary) and added none.
+
 URDF, D–H and PoE agree to about 1e-15 on random configurations. The screw Jacobian matches central differences to about 1e-10, and all 8 configurations in the solver's example reproduce the target pose to about 1e-15.
 
 ## Layout
@@ -52,6 +58,7 @@ index.html            home page with the step cards
 pages/                one HTML page per step
 js/math.js            linear algebra, SE(3), Jacobi eigen-solver
 js/gofa.js            URDF parser, D–H, PoE, Jacobians, conditioning
+js/ik.js              all-solutions IK in the browser (q6 sweep + closed-form arm)
 js/viewer.js          three.js viewer (STL meshes on the URDF chain)
 js/ui.js              header, steps, tabs, sliders
 js/pages/             page scripts

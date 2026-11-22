@@ -14,14 +14,15 @@
 </head>
 <body data-step="4">
 <main class="work">
-  <section class="view" id="view">
-    <div class="heat" id="heat"><canvas id="canvas"></canvas></div>
+  <section class="view mapview" id="view">
     <div class="view-tools">
+      <div class="group mode"><a class="on" href="04-slice.html">Joint slice (q₂, q₃)</a><a href="04-plane.html">Task-space plane</a></div>
       <div class="group" id="metric">
         <button data-m="invkappa" class="on">1/κ</button><button data-m="sigmamin">σ<sub>min</sub></button><button data-m="det">sign · |det J|</button>
       </div>
       <div class="group" id="overlays"><button data-o="curves" class="on">Singular curves</button><button data-o="elbow" class="on">Elbow prediction</button></div>
     </div>
+    <div class="heat" id="heat"><canvas id="canvas"></canvas></div>
     <div class="inset" id="inset"><span class="cap" id="insetCap">Click the map to pose the robot</span></div>
     <div class="progress" id="progress" hidden>Computing…</div>
     <div class="view-legend" id="legend"></div>
@@ -41,8 +42,8 @@
         <p class="note" style="margin-top:6px">q₁ and q₆ are omitted on purpose: \(\det J\) and every singular value are independent of them. Base yaw and flange roll only rotate the whole picture (checked in <b>Method</b>).</p>
         <div class="row" style="margin-top:8px"><button id="ref">Reference wrist</button><button id="flat">q₄ = q₅ = 0</button></div>
         <div class="label">Map</div>
-        <label class="slider" style="grid-template-columns:90px 1fr 50px"><span>Resolution</span><input type="range" id="res" min="60" max="300" step="20" value="180"><output id="resOut">180</output></label>
-        <label class="slider" style="grid-template-columns:90px 1fr 50px"><span>L (m)</span><input type="range" id="L" min="0.1" max="1.5" step="0.05" value="0.5"><output id="Lout">0.50</output></label>
+        <label class="slider wide"><span>Resolution</span><input type="range" id="res" min="60" max="300" step="20" value="180"><output id="resOut">180</output></label>
+        <label class="slider wide"><span>L (m)</span><input type="range" id="L" min="0.1" max="1.5" step="0.05" value="0.5"><output id="Lout">0.50</output></label>
         <div class="tiles" id="summary" style="margin-top:10px"></div>
       </div>
 

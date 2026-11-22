@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>4 · Task-space plane slice · GoFa lab</title>
+  <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+  <script defer src="../vendor/katex/katex.min.js"></script>
+  <script defer src="../vendor/katex/contrib/auto-render.min.js"></script>
+  <script type="importmap">{"imports":{"three":"../vendor/three/build/three.module.js","three/addons/controls/OrbitControls.js":"../vendor/three/controls/OrbitControls.js"}}</script>
+  <script type="module" src="../js/pages/p4-plane.js"></script>
+</head>
+<body data-step="4">
+<main class="work">
+  <section class="view mapview" id="view">
+    <div class="view-tools">
+      <div class="group mode"><a href="04-slice.html">Joint slice (q₂, q₃)</a><a class="on" href="04-plane.html">Task-space plane</a></div>
+      <div class="group" id="planeBtns"><button data-p="xy" class="on">xy</button><button data-p="xz">xz</button><button data-p="yz">yz</button></div>
+      <select id="show" aria-label="Map shows"></select>
+    </div>
+    <div class="heat" id="heat"><canvas id="canvas"></canvas></div>
+    <div class="inset" id="inset"><span class="cap" id="insetCap">Tap the map to pose the robot</span></div>
+    <div class="progress" id="progress" hidden>Computing…</div>
+    <div class="view-legend" id="legend"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="eyebrow">Step 4 · Singularity in task space</div>
+      <h1>Conditioning on a Cartesian plane</h1>
+      <p>Pick a plane and its offset, fix the tool, then solve IK at every point and evaluate the full Jacobian of each solution.</p>
+    </div>
+    <div class="tabs"><button data-tab="plane" class="active">Plane &amp; tool</button><button data-tab="inspect">Inspect</button><button data-tab="method">Method</button></div>
+    <div class="panel-body">
+      <div data-pane="plane">
+        <div class="label">Plane</div>
+        <div class="seg" id="planeSeg"><button data-p="xy" class="on">xy · fixed z</button><button data-p="xz">xz · fixed y</button><button data-p="yz">yz · fixed x</button></div>
+        <label class="slider wide"><span id="offName">z (m)</span><input type="range" id="off" step="0.01"><output id="offOut"></output></label>
+        <p class="note" id="offNote"></p>
+
+        <div class="label">Tool orientation (tool z axis = approach)</div>
+        <div class="seg wrap" id="toolSeg">
+          <button data-t="down" class="on">Down −z</button><button data-t="fwd">Forward +x</button><button data-t="side">Side +y</button><button data-t="up">Up +z</button><button data-t="custom">Custom</button>
+        </div>
+        <div id="rpy" class="sliders" style="margin-top:6px">
+          <label class="slider wide"><span>roll (°)</span><input type="range" min="-180" max="180" step="1" data-k="0"><output></output></label>
+          <label class="slider wide"><span>pitch (°)</span><input type="range" min="-180" max="180" step="1" data-k="1"><output></output></label>
+          <label class="slider wide"><span>yaw (°)</span><input type="range" min="-180" max="180" step="1" data-k="2"><output></output></label>
+        </div>
+        <p class="note" style="margin-top:4px">Orientation = R<sub>z</sub>(yaw) R<sub>y</sub>(pitch) R<sub>x</sub>(roll), held constant over the whole plane.</p>
+
+        <div class="label">Tool length (TCP offset along tool z)</div>
+        <label class="slider wide"><span>length (m)</span><input type="range" id="tcp" min="0" max="0.30" step="0.01" value="0"><output id="tcpOut">0.00</output></label>
+        <p class="note">0 = flange (tool0). The map point is the TCP; the Jacobian is taken about the TCP.</p>
+
+        <div class="label">Map</div>
+        <label class="slider wide"><span>Resolution</span><input type="range" id="res" min="40" max="160" step="10" value="90"><output id="resOut">90</output></label>
+        <label class="slider wide"><span>L (m)</span><input type="range" id="L" min="0.1" max="1.5" step="0.05" value="0.5"><output id="Lout">0.50</output></label>
+        <label class="toggle"><input type="checkbox" id="limits" checked> Only solutions within joint limits</label>
+        <div class="tiles" id="summary" style="margin-top:10px"></div>
+      </div>
+
+      <div data-pane="inspect">
+        <p class="note">Tap (or drag) on the map. Every IK solution at that point is listed; pick one to pose the robot.</p>
+        <div class="tiles" id="probeTiles"></div>
+        <div class="scroll-x" id="solTable"></div>
+        <p class="note" id="probeNote" style="margin-top:8px"></p>
+      </div>
+
+      <div data-pane="method">
+        <div class="card"><h3>What each pixel is</h3><p class="sub">A TCP position on the chosen plane with the fixed tool orientation. The flange pose is \(T_{0,\text{tool0}} = T_{\text{TCP}}\,\operatorname{Trans}(0,0,-\ell)\). All IK solutions are computed, then for each one the 6×6 geometric Jacobian about the TCP, with linear rows scaled by \(1/L\). The map shows \(1/\kappa = \sigma_{\min}/\sigma_{\max}\) of the best branch, of one chosen branch, or how many valid solutions exist. Grey means no valid solution.</p></div>
+        <div class="card"><h3>IK in the browser</h3><p class="sub">For a fixed \(q_6\), the frame-4 origin \(O_4 = p - d_6 z_6 - a_5 x_5(q_6)\) and the axis-5 direction \(z_4 = x_5 \times z_6\) are known. \(O_4\) depends only on \((q_1,q_2,q_3)\), giving 2 shoulder × 2 elbow closed-form arm solutions. The remaining condition, axis 5 ⟂ forearm axis, \(f(q_6) = z_3 \cdot z_4 = 0\), is solved per arm branch by sampling \(q_6\) and refining each sign change. \(q_4, q_5\) follow from \(z_4\) and \(x_5\). Every candidate is accepted only if our FK reproduces the pose to \(10^{-7}\).</p></div>
+        <div class="card"><h3>Validation</h3><p class="sub">On 400 random poses the JS solver and the supplied <code>crb15000-ik</code> agreed on 2947 configurations, with 3 found only by the supplied solver (all at the elbow reach boundary) and none found only by the JS one. <code>node tests/check.mjs</code> repeats the example and a 1000-pose round trip.</p></div>
+        <div class="card"><h3>Branch labels</h3><p class="sub">Front/back: whether \(q_1\) points at \(O_4\) or past it. \(q_3 \gtrless q_3^*\): which side of the elbow singularity (\(q_3^* = -76.83^\circ\)). \(q_5 \gtrless 0\): wrist flip. These are pointwise labels, good for reading the map; persistent branch tracking is Step 5.</p></div>
+      </div>
+    </div>
+    <div class="panel-foot"></div>
+  </aside>
+</main>
+</body>
+</html>

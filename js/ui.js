@@ -6,7 +6,7 @@ export const STEPS = [
   { n: 1, file: '01-model.html', title: 'Kinematic model', short: 'URDF → D–H & screws' },
   { n: 2, file: '02-fk.html', title: 'FK validation', short: 'URDF vs D–H vs PoE' },
   { n: 3, file: '03-jacobian.html', title: 'Jacobian', short: 'Screw J and ³J₅' },
-  { n: 4, file: '04-slice.html', title: '(q₂, q₃) slice', short: 'Conditioning map' },
+  { n: 4, file: '04-slice.html', title: 'Conditioning slices', short: '(q₂, q₃) and xy · xz · yz planes' },
   { n: 5, file: '05-ik-branches.html', title: 'IK branches', short: 'Validate & track', soon: true },
   { n: 6, file: '06-placement.html', title: 'Contour & placement', short: 'Task family', soon: true },
   { n: 7, file: '07-feasibility.html', title: 'Feasibility maps', short: 'Per branch & failure', soon: true },
@@ -30,6 +30,7 @@ export function mountChrome() {
     return s.soon ? `<span class="${cls}" title="Needs the IK pipeline — next stage">${inner}</span>` : `<a class="${cls}" href="${s.file}">${inner}</a>`;
   }).join('');
   document.body.prepend(header, steps);
+  if (window.matchMedia('(max-width: 980px)').matches) document.querySelectorAll('details.dock').forEach((d) => { d.open = false; });
   steps.querySelector('.current')?.scrollIntoView({ inline: 'center', block: 'nearest' });
 
   const prev = STEPS.find((s) => s.n === step - 1), next = STEPS.find((s) => s.n === step + 1 && !s.soon);
