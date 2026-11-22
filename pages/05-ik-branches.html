@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>5 · IK branches · GoFa lab</title>
+  <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+  <script defer src="../vendor/katex/katex.min.js"></script>
+  <script defer src="../vendor/katex/contrib/auto-render.min.js"></script>
+  <script type="importmap">{"imports":{"three":"../vendor/three/build/three.module.js","three/addons/controls/OrbitControls.js":"../vendor/three/controls/OrbitControls.js"}}</script>
+  <script type="module" src="../js/pages/p5-branches.js"></script>
+</head>
+<body data-step="5">
+<main class="work">
+  <section class="view" id="view">
+    <div class="view-tools">
+      <div class="group" id="orientBtns"><button data-o="A" class="on">Orientation A</button><button data-o="B">Orientation B</button></div>
+      <div class="group" id="views"><button data-v="iso">Iso</button><button data-v="top">Top</button><button data-v="side">Side</button></div>
+      <div class="group"><button id="play">▶ Play</button></div>
+    </div>
+    <div class="view-status" id="status">Loading GoFa meshes…</div>
+    <div class="view-legend" id="legend"></div>
+  </section>
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="eyebrow">Step 5 · IK solutions</div>
+      <h1>Validate and organise into persistent branches</h1>
+      <p>All candidates along the contour of the current placement (Step 6), checked with our FK, periodic angles resolved, limits applied, then linked sample to sample into branches.</p>
+    </div>
+    <div class="tabs"><button data-tab="br" class="active">Branches</button><button data-tab="val">Validate</button><button data-tab="sup">Supplied solver</button><button data-tab="method">Method</button></div>
+    <div class="panel-body">
+      <div data-pane="br">
+        <div class="tiles" id="tiles"></div>
+        <label class="slider wide"><span>sample k</span><input type="range" id="kSlider" min="0" max="40" step="1" value="0"><output id="kOut">0</output></label>
+        <div class="seg" id="jointSeg"></div>
+        <canvas class="plot" id="jPlot" style="margin-top:8px"></canvas>
+        <canvas class="plot" id="cPlot"></canvas>
+        <div class="label">Persistent branches (tap one)</div>
+        <div class="scroll-x" id="brTable"></div>
+      </div>
+      <div data-pane="val">
+        <div class="tiles" id="valTiles"></div>
+        <div class="card"><h3>Conventions applied to every candidate</h3><p class="sub">q₁, q₂, q₄, q₅ are wrapped to (−180°, 180°]; their range is exactly one turn, so the representative is unique and crossing ±180° is a real discontinuity. q₃ is shifted by whole turns into [−225°, 85°]; if no shift fits, the candidate violates the limit. q₆ has a 540° range, so a candidate can have two physical representatives (q₆ and q₆ ± 360°); both are kept for the continuity search.</p></div>
+        <div class="scroll-x" id="valTable"></div>
+      </div>
+      <div data-pane="sup">
+        <p class="note">The example output of the supplied <code>crb15000-ik</code> (pose p = (0.571, 0, 0.899) m, q = [0.7071, 0, 0.7071, 0]), re-checked with our own PoE FK.</p>
+        <div class="scroll-x" id="supTable"></div>
+        <p class="note" id="supNote"></p>
+      </div>
+      <div data-pane="method">
+        <div class="card"><h3>Candidates</h3><p class="sub">At every contour sample the browser IK (same structure as the supplied solver: sweep of q₆, closed-form arm, root refinement) returns every configuration. A candidate is kept only if our FK reproduces the pose to 1e-7 m / rad.</p></div>
+        <div class="card"><h3>Persistent branches</h3><p class="sub">Between consecutive samples, candidates are matched greedily by the smallest torus distance \(\max_i |\mathrm{wrap}(q_i^{k+1} - q_i^{k})|\), with a gate of 1.5 Δq<sub>max</sub>. A branch ends when nothing is within the gate (two branches meet at a singularity, or the pose leaves the reachable set); unmatched candidates start new branches. Labels (shoulder / elbow side / wrist sign) can change along a branch, which is why tracking is done on q itself.</p></div>
+        <div class="card"><h3>Closing the loop</h3><p class="sub">The contour is closed, so the last sample is matched back to the first. A branch can return to itself, or to a different branch (it permutes, like going around a branch point), which matters for repeating the task.</p></div>
+      </div>
+    </div>
+    <div class="panel-foot"></div>
+  </aside>
+</main>
+</body>
+</html>

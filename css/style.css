@@ -220,3 +220,19 @@ table.sols tr.out td { color: #a0a0a0; text-decoration: line-through; }
   /* keep the joint dock inside the 3D view on phones (collapsed by default, scrolls when opened) */
   .dock { position: absolute; left: 8px; right: 8px; bottom: 8px; width: auto; margin: 0; max-height: 55%; overflow: auto; z-index: 3; }
 }
+
+/* ---------- steps 5–7 */
+.field { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 12px; font-weight: 600; }
+.field select, select.full { width: 100%; min-height: 30px; font-size: 12px; }
+canvas.plot { display: block; width: 100%; height: 170px; margin-bottom: 6px; }
+table.starts td, table.starts th { padding: 4px 6px; font-size: 11.5px; white-space: nowrap; }
+table.starts tr[data-i] { cursor: pointer; }
+table.starts tr[data-i]:hover td { background: #fafafa; }
+table.starts tr.sel td { background: #e9fbff; }
+.tag { display: inline-block; padding: 1px 6px; border-radius: 9px; font-size: 10.5px; font-weight: 600; color: #fff; }
+.minimaps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 12px 12px; }
+.minimap { border: 1px solid var(--line); border-radius: 6px; padding: 4px; background: #fff; cursor: pointer; }
+.minimap.on { outline: 2px solid var(--red); }
+.minimap canvas { display: block; width: 100%; aspect-ratio: 1; }
+.minimap small { display: block; font-size: 10px; color: var(--muted); padding: 2px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 980px) { .minimaps { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 8px 8px; } }

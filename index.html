@@ -27,9 +27,9 @@
     2: 'URDF, D–H and PoE forward kinematics compared live, on thousands of random configurations, and against the supplied solver.',
     3: 'Screw-based Jacobian with geometric column view, the course subchain Jacobian ³J₅, conditioning and finite-difference checks.',
     4: 'Full-robot conditioning over shoulder × elbow, with classified singular curves, plus task-space slices on an xy, xz or yz plane at any height, for any tool orientation and length.',
-    5: 'Run the supplied solver, validate every configuration with our FK, unwrap periodic angles, apply limits and track persistent branches.',
-    6: 'One closed full-pose contour and its two-dimensional placement family, for at least two tool orientations.',
-    7: 'Branch-resolved feasibility maps, with failures split into no IK, joint limit, continuity and singularity margin.',
+    5: 'Every IK candidate along the contour validated with our FK, periodic angles resolved, limits applied, then linked into persistent branches (and what happens after one loop).',
+    6: 'One closed full-pose contour (ellipse with tilting, spinning tool) and its 2-D placement grid, for two global tool orientations. Animate any start.',
+    7: 'Branch-resolved feasibility maps over the placement grid, failures split into no IK, joint limit, discontinuity and singularity margin, plus nearest vs branch-aware.',
     8: 'Nearest-configuration continuation against branch-aware global search, with representative trajectories.',
   };
   document.getElementById('cards').innerHTML = STEPS.map((s) => `

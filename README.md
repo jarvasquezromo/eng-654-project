@@ -12,9 +12,9 @@ Each part of the assignment gets its own page: a 3D view (or map) plus one side 
 | 2 | FK validation: URDF vs D–H vs PoE, plus a check against the supplied IK solver | ✅ |
 | 3 | Screw Jacobian, ³J₅, conditioning, finite-difference verification | ✅ |
 | 4 | Conditioning slices: (q₂, q₃) with classified singular curves, and task-space xy / xz / yz planes at any offset, tool orientation and tool length | ✅ |
-| 5 | IK validation and persistent branches | next |
-| 6 | Closed contour and placement family | next |
-| 7 | Branch-resolved feasibility and failure maps | next |
+| 5 | IK validation (our FK, periodic angles, limits) and persistent branches along the contour | ✅ |
+| 6 | Closed full-pose contour and its 2-D placement family, two tool orientations | ✅ |
+| 7 | Branch-resolved feasibility and failure maps (no IK / limit / discontinuity / margin), nearest vs branch-aware | ✅ |
 | 8 | Nearest vs branch-aware continuation | next |
 
 ## Open it
@@ -47,6 +47,13 @@ Standard D–H, `Rz(θ) Tz(d) Tx(a) Rx(α)`, with `θi = qi + θi,0`. Frame 6 is
 | 5 | 0 | 0 | 0.080 | −π/2 |
 | 6 | π | 0.101 | 0 | 0 |
 
+### Steps 5–7 in short
+
+- **Contour**: ellipse (semi-axes a, b) in the plane perpendicular to the global tool direction R_g; the tool tilts ±θ and spins ±ψ periodically, so it is a closed 6-D pose path, sampled at N points.
+- **Placements**: the contour centre moves over an n × n grid in x, y at fixed height z; repeated for orientation A and B (defaults: tool down, tool forward).
+- **Feasibility**: each start configuration at s = 0 is followed around the loop. Nearest continuation fails on the first of: no IK, joint step > Δq_max, joint limit (after unwrapping), 1/κ < margin. Branch-aware search uses a layered graph of all in-limit, in-margin configurations and succeeds if the start pose is reached again.
+- Settings are shared between Steps 5–7 in the browser (localStorage). Step 7 runs in web workers; a 19 × 19 grid takes about 15 s on a laptop.
+
 The browser IK (`js/ik.js`) fixes q₆, solves the arm (q₁, q₂, q₃) in closed form for the frame-4 origin, and finds the q₆ roots of z₃ · z₄ = 0 per arm branch. On 400 random poses it matched the supplied `crb15000-ik` solver on 2947 configurations, missed 3 (all at the elbow reach boundary) and added none.
 
 URDF, D–H and PoE agree to about 1e-15 on random configurations. The screw Jacobian matches central differences to about 1e-10, and all 8 configurations in the solver's example reproduce the target pose to about 1e-15.
@@ -59,6 +66,9 @@ pages/                one HTML page per step
 js/math.js            linear algebra, SE(3), Jacobi eigen-solver
 js/gofa.js            URDF parser, D–H, PoE, Jacobians, conditioning
 js/ik.js              all-solutions IK in the browser (q6 sweep + closed-form arm)
+js/tasks.js           contour, placement grid, candidates, branch tracking, both continuation strategies
+js/feas-worker.js     web worker that evaluates placements for the Step 7 maps (js/pool.js runs several)
+js/taskui.js, plot.js drawing helpers for Steps 5–7
 js/viewer.js          three.js viewer (STL meshes on the URDF chain)
 js/ui.js              header, steps, tabs, sliders
 js/pages/             page scripts

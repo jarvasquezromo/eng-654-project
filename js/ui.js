@@ -7,9 +7,9 @@ export const STEPS = [
   { n: 2, file: '02-fk.html', title: 'FK validation', short: 'URDF vs D–H vs PoE' },
   { n: 3, file: '03-jacobian.html', title: 'Jacobian', short: 'Screw J and ³J₅' },
   { n: 4, file: '04-slice.html', title: 'Conditioning slices', short: '(q₂, q₃) and xy · xz · yz planes' },
-  { n: 5, file: '05-ik-branches.html', title: 'IK branches', short: 'Validate & track', soon: true },
-  { n: 6, file: '06-placement.html', title: 'Contour & placement', short: 'Task family', soon: true },
-  { n: 7, file: '07-feasibility.html', title: 'Feasibility maps', short: 'Per branch & failure', soon: true },
+  { n: 5, file: '05-ik-branches.html', title: 'IK branches', short: 'Validate & track' },
+  { n: 6, file: '06-placement.html', title: 'Contour & placement', short: 'Task family' },
+  { n: 7, file: '07-feasibility.html', title: 'Feasibility maps', short: 'Per branch & failure' },
   { n: 8, file: '08-continuation.html', title: 'Continuation', short: 'Nearest vs branch-aware', soon: true },
 ];
 

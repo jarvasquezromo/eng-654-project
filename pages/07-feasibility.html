@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>7 · Feasibility maps · GoFa lab</title>
+  <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+  <script defer src="../vendor/katex/katex.min.js"></script>
+  <script defer src="../vendor/katex/contrib/auto-render.min.js"></script>
+  <script type="importmap">{"imports":{"three":"../vendor/three/build/three.module.js","three/addons/controls/OrbitControls.js":"../vendor/three/controls/OrbitControls.js"}}</script>
+  <script type="module" src="../js/pages/p7-feasibility.js"></script>
+</head>
+<body data-step="7">
+<main class="work">
+  <section class="view mapview" id="view">
+    <div class="view-tools">
+      <div class="group" id="orientBtns"><button data-o="A" class="on">Orientation A</button><button data-o="B">Orientation B</button></div>
+      <select id="mode" aria-label="Map shows">
+        <option value="reason">Failure reason (nearest continuation)</option>
+        <option value="countN">Feasible starts · nearest</option>
+        <option value="countA">Feasible starts · branch-aware</option>
+        <option value="cmp">Nearest vs branch-aware</option>
+      </select>
+      <select id="branch" aria-label="Start branch"></select>
+    </div>
+    <div class="heat" id="heat"><canvas id="canvas"></canvas></div>
+    <div class="progress" id="progress" hidden>Computing…</div>
+    <div class="view-legend" id="legend"></div>
+  </section>
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="eyebrow">Step 7 · Placement feasibility</div>
+      <h1>Branch-resolved feasibility maps</h1>
+      <p>Every placement of the contour (Step 6), every start configuration, followed around the whole loop. Where it fails, the first reason is recorded.</p>
+    </div>
+    <div class="tabs"><button data-tab="sum" class="active">Summary</button><button data-tab="br">Per branch</button><button data-tab="ins">Inspect</button><button data-tab="set">Criteria</button><button data-tab="method">Method</button></div>
+    <div class="panel-body">
+      <div data-pane="sum">
+        <div class="tiles" id="sumTiles"></div>
+        <div class="label">Starts by outcome (nearest continuation)</div>
+        <div id="reasonBars"></div>
+        <p class="note" id="sumNote"></p>
+      </div>
+      <div data-pane="br">
+        <p class="note" style="margin-bottom:8px">One failure-reason map per start branch (label at s = 0). Tap a map to show it large.</p>
+        <div class="minimaps" id="minimaps" style="padding:0"></div>
+      </div>
+      <div data-pane="ins">
+        <p class="note">Tap a placement on the map.</p>
+        <div class="tiles" id="insTiles"></div>
+        <div class="scroll-x" id="insTable"></div>
+        <p style="margin-top:10px"><a class="button" id="toStep6" href="06-placement.html">Open this placement in Step 6 →</a></p>
+      </div>
+      <div data-pane="set">
+        <div class="label">Failure criteria</div>
+        <label class="slider wide"><span>Δq max (°/sample)</span><input type="range" data-s="dqMax" min="2" max="60" step="1" data-d="0" data-u="°"><output></output></label>
+        <label class="slider wide"><span>1/κ margin</span><input type="range" data-s="margin" min="0" max="0.15" step="0.005" data-d="3"><output></output></label>
+        <label class="slider wide"><span>L (m)</span><input type="range" data-s="L" min="0.1" max="1.5" step="0.05" data-d="2"><output></output></label>
+        <div class="label">Grid</div>
+        <label class="slider wide"><span>grid n × n</span><input type="range" data-s="gridN" min="5" max="41" step="2" data-d="0"><output></output></label>
+        <label class="slider wide"><span>samples N</span><input type="range" data-s="N" min="16" max="120" step="4" data-d="0"><output></output></label>
+        <p class="note">Contour shape, orientations, height and grid ranges are set in Step 6. Changes here are shared with Steps 5 and 6.</p>
+        <div class="tiles" id="setTiles" style="margin-top:10px"></div>
+      </div>
+      <div data-pane="method">
+        <div class="card"><h3>Per placement</h3><p class="sub">The contour is sampled at N poses. All IK candidates are computed at each one. Each start configuration at s = 0 (each candidate within limits, and each physical q₆ representative) is a separate start; its branch label is the one at s = 0.</p></div>
+        <div class="card"><h3>Nearest continuation</h3><p class="sub">From the current q, take the candidate at the next sample that is closest on the joint torus and unwrap it next to q. Tests in order: <b>loss of IK</b> (no candidate at that sample), <b>discontinuity</b> (closest candidate further than Δq<sub>max</sub>), <b>joint limit</b> (unwrapped q outside the URDF range), <b>singularity margin</b> (1/κ below the threshold). The first failing test along the loop is the reason; success means all N steps back to s = 0.</p></div>
+        <div class="card"><h3>Branch-aware search</h3><p class="sub">A layered graph over all samples: nodes are physical configurations within limits and margin, edges join consecutive samples when every joint moves ≤ Δq<sub>max</sub>. A start succeeds if any node of the last layer (the start pose again) is reachable. It keeps alternatives instead of committing to the nearest candidate.</p></div>
+        <div class="card"><h3>Reading the summary colour</h3><p class="sub">Green: at least one start completes (darker = more). Otherwise the colour is the reason of the start that got furthest. Grey: some sample has no IK at all. Light hatched: the selected start branch does not exist at s = 0 there.</p></div>
+      </div>
+    </div>
+    <div class="panel-foot"></div>
+  </aside>
+</main>
+</body>
+</html>

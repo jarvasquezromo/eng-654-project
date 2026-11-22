@@ -87,6 +87,22 @@ for (let n = 0; n < NRT; n++) {
 check('JS IK solutions reproduce the pose (max error)', eRT, 1e-7);
 check(`JS IK round trip, fraction of q not recovered (${miss}/${NRT})`, miss / NRT, 0.02);
 
+// 5d. Task layer: contour closes, a central placement is feasible, the nearest path respects every criterion
+{
+  const { DEFAULTS, contourPoses, centerOf, candidatesAlong, representatives, nearestContinuation, evaluatePlacement } = await import('../js/tasks.js');
+  const S = { ...DEFAULTS, N: 24 };
+  const C = contourPoses(S, centerOf(S, S.center), 'down'), stepOf = (A, B) => maxAbsDiff(A, B);
+  const steps = C.map((T, k) => stepOf(T, C[(k + 1) % S.N])), wrapStep = steps[S.N - 1], maxInner = Math.max(...steps.slice(0, -1));
+  check('Contour closes: last→first step no larger than the others (excess)', Math.max(0, wrapStep - maxInner), 1e-12);
+  const r = evaluatePlacement(S, centerOf(S, S.center), 'down');
+  check(`Central placement: some start completes (${r.starts.filter((x) => x.nearest.ok).length}/${r.starts.length})`, r.starts.some((x) => x.nearest.ok) ? 0 : 1, 0);
+  const poses = contourPoses(S, centerOf(S, S.center), 'down'), cands = candidatesAlong(S, poses);
+  const okStart = cands[0].flatMap((c) => representatives(c.q)).map((q0) => nearestContinuation(S, cands, poses, q0, { keepPath: true })).find((x) => x.ok);
+  const worst = Math.max(...okStart.path.map((p, k) => Math.max(poseError(poeFK(p.q), poses[k % S.N]).position, poseError(poeFK(p.q), poses[k % S.N]).rotation)));
+  check('Feasible nearest path reproduces every contour pose', worst, 1e-7);
+  check('Feasible nearest path: max joint step ≤ Δq_max (excess, rad)', Math.max(0, ...okStart.path.map((p) => p.step - (S.dqMax * Math.PI) / 180)), 0);
+}
+
 // 6. Reference configuration is regular
 const c = conditioning(toolJacobian(REFERENCE_Q));
 console.log(`INFO  reference q: sigma_min=${c.sigmaMin.toFixed(4)} kappa=${c.kappa.toFixed(2)} det=${c.det.toExponential(3)}`);
