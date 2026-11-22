@@ -36,7 +36,11 @@
     <${s.soon ? 'div' : 'a'} class="pcard ${s.soon ? 'soon' : ''}" ${s.soon ? '' : `href="pages/${s.file}"`}>
       <span class="n">${s.n}</span><h2>${s.title}</h2><p>${blurbs[s.n]}</p>
       <span class="tag">${s.soon ? 'Next stage: needs the IK pipeline' : 'Open →'}</span>
-    </${s.soon ? 'div' : 'a'}>`).join('');
+    </${s.soon ? 'div' : 'a'}>`).join('') + `
+    <a class="pcard" href="pages/atlas.html">
+      <span class="n">+</span><h2>3R atlas (Lecture 06)</h2><p>det Jₚ over (q₂, q₃), critical curves in (ρ, z), regular IK counts per region and cusps. Course presets a₁ = 0 / a₁ = 1 and GoFa's own arm subchain; edit any D–H parameter.</p>
+      <span class="tag">Open →</span>
+    </a>`;
 </script>
 </body>
 </html>

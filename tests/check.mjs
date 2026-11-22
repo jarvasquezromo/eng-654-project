@@ -103,6 +103,22 @@ check(`JS IK round trip, fraction of q not recovered (${miss}/${NRT})`, miss / N
   check('Feasible nearest path: max joint step ≤ Δq_max (excess, rad)', Math.max(0, ...okStart.path.map((p) => p.step - (S.dqMax * Math.PI) / 180)), 0);
 }
 
+// 5e. 3R atlas (Lecture 06): determinant formula, cusps of the offset preset, IK count at the lecture target
+{
+  const { PRESETS, detJp, buildAtlas, solveMeridian } = await import('../js/atlas.js');
+  let eD = 0;
+  for (let n = 0; n < 200; n++) {
+    const q2 = 6 * Math.random() - 3, q3 = 6 * Math.random() - 3, c2 = Math.cos(q2), c3 = Math.cos(q3), s3 = Math.sin(q3);
+    eD = Math.max(eD, Math.abs(detJp(PRESETS.offset, q2, q3) - 0.75 * (3 * c3 + 4) * (c2 * (c3 - 2 * s3) - s3)));
+  }
+  check('Atlas det Jp = ¾(3c₃+4)[c₂(c₃−2s₃)−s₃] (offset preset)', eD, 1e-12);
+  const A = buildAtlas(PRESETS.offset), ref = [[-129.783, 66.385, 2.4656, -0.9987], [-78.596, -171.935, 1.3555, 0.4953], [78.596, -171.935, 1.3555, 1.5047], [129.783, 66.385, 2.4656, 2.9987]];
+  const eC = Math.max(...ref.map((r) => Math.min(...A.cusps.map((c) => Math.max(Math.abs(c.image[0] - r[2]), Math.abs(c.image[1] - r[3])))))) ;
+  check(`Atlas cusps match the lecture table (${A.cusps.length} found, max image error m)`, A.cusps.length === 4 ? eC : 1, 2e-3);
+  check('Atlas a₁ = 0 preset has no cusps', buildAtlas(PRESETS.zero).cusps.length, 0);
+  check('Atlas lecture target (1.498, 1.481) has 4 regular IK', Math.abs(solveMeridian(A, 1.498, 1.481).length - 4), 0);
+}
+
 // 6. Reference configuration is regular
 const c = conditioning(toolJacobian(REFERENCE_Q));
 console.log(`INFO  reference q: sigma_min=${c.sigmaMin.toFixed(4)} kappa=${c.kappa.toFixed(2)} det=${c.det.toExponential(3)}`);

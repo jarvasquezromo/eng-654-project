@@ -236,3 +236,21 @@ table.starts tr.sel td { background: #e9fbff; }
 .minimap canvas { display: block; width: 100%; aspect-ratio: 1; }
 .minimap small { display: block; font-size: 10px; color: var(--muted); padding: 2px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 980px) { .minimaps { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 8px 8px; } }
+
+/* ---------- 3R atlas */
+.twin { position: absolute; inset: 54px 12px 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.twin .pane { position: relative; border: 1px solid var(--line); border-radius: 8px; background: #fff; display: flex; flex-direction: column; min-height: 0; }
+.twin .pane-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 8px 10px 0; font-size: 13px; }
+.twin .pane-head small { color: var(--muted); font-size: 10.5px; text-align: right; }
+.twin canvas { flex: 1; width: 100%; min-height: 0; cursor: crosshair; touch-action: pan-y pinch-zoom; }
+.numgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 10px 0; }
+.num { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #555; }
+.num input { width: 100%; min-height: 30px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; font: inherit; font-size: 13px; color: var(--ink); }
+.formula { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #f3f3f3; border-left: 3px solid #555; padding: 8px 10px; }
+.chip { border: 1.5px solid currentColor; background: #fff; border-radius: 5px; padding: 3px 9px; font-weight: 650; font-size: 12px; min-height: 28px; }
+.chip.on { color: #fff !important; }
+@media (max-width: 980px) {
+  .twin { position: static; grid-template-columns: 1fr; padding: 0 8px; }
+  .twin .pane { height: min(100vw, 70vh); }
+  .numgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
