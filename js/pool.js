@@ -17,7 +17,7 @@ export function makePool() {
           const step = () => {
             if (id !== gen) return resolve(false);
             const t0 = performance.now();
-            while (k < jobs.length && performance.now() - t0 < 30) { const j = jobs[k++]; onResult(j.i, evaluatePlacement(S, centerOf(S, j.xy), orient)); }
+            while (k < jobs.length && performance.now() - t0 < 30) { const j = jobs[k++]; onResult(j.i, evaluatePlacement(S, centerOf(S, j.xy), orient, j.sols ? (T0, q) => j.sols[q] : null)); }
             if (k < jobs.length) requestAnimationFrame(step); else resolve(true);
           };
           step();

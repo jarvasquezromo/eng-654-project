@@ -4,10 +4,14 @@ import { mountChrome, mountTabs, renderMath, $, $$ } from '../ui.js';
 import { RobotViewer, THREE } from '../viewer.js';
 import { buildGofaAtlas, solvePoint, sheetConfig, meridianOf, wrap, Q3_FORBIDDEN, APPROACH } from '../gofa-atlas.js';
 import { fmt, rpy, rad } from '../math.js';
-import { solveTool } from '../tool-atlas.js';
+import { solveTool, toolPose } from '../tool-atlas.js';
+import { sheetOf, detJ, verticalPose } from '../gofa-atlas.js';
+import { useSupplied, solveVerified } from '../supplied.js';
+import { mountIkSource } from '../ikui.js';
 
 mountChrome();
 mountTabs();
+mountIkSource();
 
 const PI = Math.PI;
 const IK_COLORS = ['#c62828', '#1f5fa8', '#2e7d32', '#7b3fa0', '#e8590c', '#00838f', '#6d4c41', '#ad1457', '#5c6bc0', '#9e9d24', '#d81b60', '#00897b', '#8d6e63', '#3949ab', '#f4511e', '#546e7a'];
@@ -118,6 +122,7 @@ function rebuild() {
   solve();
 }
 function solve() {
+  state.src = 'browser IK';
   if (exact()) {
     const t = state.target;
     state.sols = solvePoint(state.ap, [t[0], t[1], t[2] - dzTool()]).sort((a, b) => a.id.localeCompare(b.id) || a.a - b.a);
@@ -125,17 +130,42 @@ function solve() {
     state.sols = solveTool(toolR(), state.tool.len, state.target).map((x) => ({ ...x, id: x.w > 0 ? '+' : '−', a: wrap(x.q[1]), b: wrap(x.q[2]) }))
       .sort((a, b) => b.w - a.w || a.a - b.a);
   }
+  render();
+  fetchSupplied(); // replace with the supplied solver's verified answers when the helper is on
+}
+function render() {
   const list = shown();
   state.sel = Math.min(state.sel, Math.max(0, list.length - 1));
   const [x, y, z] = state.target, rho = Math.hypot(x, y);
   $('#ikTiles').innerHTML = [['tool point (m)', `${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}`], ['ρ (m)', rho.toFixed(3)], ['IK solutions', state.sols.continuum ? `∞ (${state.sols.filter((s) => s.family).length} families)` : state.limits ? `${list.length} in limits / ${state.sols.length}` : state.sols.length]]
     .map(([k, x]) => `<div class="tile"><small>${k}</small><b>${x}</b></div>`).join('');
   $('#ikChips').innerHTML = list.map((s, i) => `<button class="chip ${i === state.sel ? 'on' : ''}" data-i="${i}" style="color:${IK_COLORS[i % 16]};${i === state.sel ? `background:${IK_COLORS[i % 16]}` : ''}">IK ${i + 1}</button>`).join('') || '<span class="note">No solution: the target is outside the workspace for this tool.</span>';
-  $$('#ikChips .chip').forEach((c) => (c.onclick = () => { state.sel = Number(c.dataset.i); solve(); }));
+  $$('#ikChips .chip').forEach((c) => (c.onclick = () => { state.sel = Number(c.dataset.i); render(); }));
   $('#ikTable').innerHTML = list.length ? `<table class="starts"><thead><tr><th>IK</th><th>sheet</th>${[1, 2, 3, 4, 5, 6].map((i) => `<th>q${'₁₂₃₄₅₆'[i - 1]}</th>`).join('')}<th>det J</th></tr></thead><tbody>${
     list.map((s, i) => `<tr class="${i === state.sel ? 'sel' : ''} ${s.within ? '' : 'out'}"><td><span class="dot" style="background:${IK_COLORS[i % 16]}"></span>${i + 1}</td><td><span class="dot" style="background:${SHEET_COLORS[s.id] || NUM_COLORS[s.id]}"></span>${exact() ? s.id : `q₅ ${s.id === '+' ? '≥' : '<'} 0`}</td>${s.q.map((x) => `<td>${deg(x)}</td>`).join('')}<td>${fmt(s.det, 3)}</td></tr>`).join('')
   }</tbody></table>${state.sols.continuum ? '<p class="note" style="margin-top:8px">Singular pose: the IK set contains continuous families (q₁ and q₆ can turn together without moving the tool), so there are infinitely many solutions. Each family is shown by one member.</p>' : ''}` : '';
+  $('#srcNote').textContent = state.suppliedNote && state.fromSupplied ? state.suppliedNote : 'IK from the browser solver (switch “IK” at the top right to use the supplied solver).';
   paintAll(); showRobot(); legend();
+}
+// IK panel from the supplied solver (the maps keep the browser IK for speed)
+let reqId = 0;
+async function fetchSupplied() {
+  const id = ++reqId, target = state.target.slice();
+  state.fromSupplied = false;
+  if (!(await useSupplied())) return;
+  const T = exact() ? verticalPose(state.ap, [target[0], target[1], target[2] - dzTool()]) : toolPose(toolR(), state.tool.len, target);
+  try {
+    const { sols, stats } = await solveVerified([T]);
+    if (sols[0].error) sols[0].forEach((x) => { x.fallback = true; });
+    if (id !== reqId || target.some((x, i) => x !== state.target[i])) return;
+    const list = sols[0].map((s) => (exact() ? { ...s, ...sheetOf(s.q), det: detJ(s.q) } : { ...s, w: s.q[4] >= 0 ? 1 : -1, id: s.q[4] >= 0 ? '+' : '−', a: wrap(s.q[1]), b: wrap(s.q[2]), det: detJ(s.q) }));
+    const n0 = state.sols.length;
+    state.suppliedNote = sols[0].error ? `supplied solver gave up (${sols[0].error}); showing the browser IK for this pose` : `supplied solver · ${stats.accepted}/${stats.returned} verified by our FK (max ${stats.maxPos.toExponential(1)} m) · browser IK found ${n0}`;
+    if (sols[0].error) { state.fromSupplied = true; render(); return; }
+    state.sols = list.sort((a, b) => String(a.id).localeCompare(String(b.id)) || a.a - b.a);
+    state.fromSupplied = true;
+    render();
+  } catch (e) { $('#srcNote').textContent = `supplied solver failed: ${e.message}`; }
 }
 
 // ---------------------------------------------------------------- drawing helpers
@@ -496,7 +526,7 @@ function paintWristNum(id, w) {
 function tapWristNum(g, x, y) {
   const list = shown();
   const hit = list.findIndex((s) => s.w === g.w && Math.hypot(g.X(s.q[1]) - x, g.Y(s.q[2]) - y) < 10);
-  if (hit >= 0) { state.sel = hit; solve(); return; }
+  if (hit >= 0) { state.sel = hit; render(); return; }
   const N = state.num; if (!N) return;
   let best = null, bd = 64;
   for (const arr of N.sols) for (let k = 0; k < arr.length; k += 6) {
@@ -509,7 +539,7 @@ function tapWristNum(g, x, y) {
   p[G.ui] = G.u0 + (i + 0.5) * G.step; p[G.vi] = G.v0 + (j + 0.5) * G.step; p[G.n] = G.h;
   state.target = p; solve();
   const near = shown().findIndex((s) => s.w === g.w && Math.abs(wrap(s.q[1] - best[1])) < 1e-6 && Math.abs(wrap(s.q[2] - best[2])) < 1e-6);
-  if (near >= 0) { state.sel = near; solve(); }
+  if (near >= 0) { state.sel = near; render(); }
 }
 function legendNum() {
   const [x, y, z] = state.target;
@@ -535,14 +565,14 @@ function pointWithRhoZ(r, z) {
   if (!exact()) return tapWristNum(g, x, y);
   const list = shown();
   const hit = list.findIndex((s) => s.id === g.sheet.id && Math.hypot(g.X(s.a) - x, g.Y(s.b) - y) < 10);
-  if (hit >= 0) { state.sel = hit; solve(); return; }
+  if (hit >= 0) { state.sel = hit; render(); return; }
   if (x < g.x0 || y < g.y0 || x > g.x0 + g.S || y > g.y0 + g.S) return;
   const a = ((x - g.x0) / g.S) * 2 * PI - PI, b = ((g.y0 + g.S - y) / g.S) * 2 * PI - PI;
   const [rr, zz] = meridianOf(sheetConfig(g.sheet, a, b, state.A.v));
   state.target = pointWithRhoZ(rr, zz + dzTool());
   solve();
   const near = shown().findIndex((s) => s.id === g.sheet.id && Math.abs(wrap(s.a - a)) < 1e-3 && Math.abs(wrap(s.b - b)) < 1e-3);
-  if (near >= 0) { state.sel = near; solve(); }
+  if (near >= 0) { state.sel = near; render(); }
 }));
 $('#wc').addEventListener('pointerdown', (e) => {
   if (!gw) return;
@@ -593,5 +623,6 @@ $('#len').onchange = (e) => commitLen(Number(e.target.value));
 $('#lenNum').onchange = (e) => commitLen(Number(e.target.value));
 syncToolUI();
 $('#toolNote').textContent = 'Tool axis vertical (down): exact atlas, all four sheets.';
+window.addEventListener('ik-source', () => solve());
 rebuild();
 renderMath();

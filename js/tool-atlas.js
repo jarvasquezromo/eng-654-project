@@ -6,10 +6,12 @@ import { solveIK } from './ik.js';
 import { homog } from './math.js';
 import { detJ } from './gofa-atlas.js';
 
-export function solveTool(R, len, p) {
+export function toolPose(R, len, p) {
   const z = [R[0][2], R[1][2], R[2][2]];
-  const T = homog(R, [p[0] - len * z[0], p[1] - len * z[1], p[2] - len * z[2]]);
-  const S = solveIK(T), out = S.map((s) => ({ q: s.q, within: s.within, family: s.family, w: s.q[4] >= 0 ? 1 : -1, det: detJ(s.q) }));
+  return homog(R, [p[0] - len * z[0], p[1] - len * z[1], p[2] - len * z[2]]);
+}
+export function solveTool(R, len, p) {
+  const S = solveIK(toolPose(R, len, p)), out = S.map((s) => ({ q: s.q, within: s.within, family: s.family, w: s.q[4] >= 0 ? 1 : -1, det: detJ(s.q) }));
   out.continuum = !!S.continuum;
   return out;
 }

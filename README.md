@@ -18,6 +18,36 @@ Each part of the assignment gets its own page: a 3D view (or map) plus one side 
 | 8 | Nearest vs branch-aware continuation | next |
 | 4+ | Topology atlas (Lecture 06 picture for GoFa): det J on the two wrist sheets, critical curves in (ρ, z), IK counts, cusps | ✅ |
 
+## Using the supplied IK solver (local helper)
+
+The pages run anywhere with the browser IK (`js/ik.js`). To use the course's `crb15000-ik` instead, as the
+assignment asks, run the helper on your computer; the site (GitHub Pages or a local copy) then talks to it
+on `http://127.0.0.1:8654`:
+
+```sh
+# Linux (glibc ≥ 2.38)
+python3 tools/ik-helper/ik_helper.py --solver ~/Downloads/abbGofa_ik/crb15000-ik-linux-x86_64/crb15000-ik
+# Windows
+py tools\ik-helper\ik_helper.py --solver C:\path\to\crb15000-ik-windows-x86_64\crb15000-ik.exe
+```
+
+Then click **IK: browser** at the top right of Steps 5–7 or the atlas and choose **Supplied solver**.
+What happens:
+
+- All contour poses are sent in one batch (`crb15000-ik solve --threads N`); a full Step 7 map is
+  14,440 poses per orientation, about 15 s on two cores.
+- Every returned configuration is checked with our PoE FK (rejected if the error is > 1e-7), q3 is shifted
+  into its range, our limit check is compared with the solver's `within_limits`, and branch labels are
+  assigned. The counts appear in the Validate tab (Step 5) and the Summary tab (Step 7).
+- If the solver gives up on a pose ("polynomial roots unresolved at 320 bits" on some symmetric poses),
+  that pose falls back to the browser IK and is counted, so a solver failure is never reported as loss of IK.
+- Works in Chrome, Edge and Firefox (localhost is allowed from an https page; the helper sends the
+  private-network CORS header). Safari may block it. The phone cannot use it: the helper runs on a computer.
+- The solver binaries are course material and are not committed (`tools/ik-helper/solver/` is ignored).
+
+On the default study both solvers return exactly the same configurations (83,608 of 83,608 on the
+14,414 poses both solve, none found by only one).
+
 ## Open it
 
 The site is served by GitHub Pages straight from `main` (root folder), so every push to `main` updates it within a minute or two. Nothing to build.
@@ -71,6 +101,9 @@ js/gofa-atlas.js      topology atlas: wrist sheets for a vertical tool, det J ze
 js/tasks.js           contour, placement grid, candidates, branch tracking, both continuation strategies
 js/feas-worker.js     web worker that evaluates placements for the Step 7 maps (js/pool.js runs several)
 js/taskui.js, plot.js drawing helpers for Steps 5–7
+js/supplied.js        supplied-solver client: helper calls, FK verification, periodic resolution, fallback
+js/ikui.js            the “IK source” switch in the header
+tools/ik-helper/      local helper that runs crb15000-ik for the pages
 js/viewer.js          three.js viewer (STL meshes on the URDF chain)
 js/ui.js              header, steps, tabs, sliders
 js/pages/             page scripts

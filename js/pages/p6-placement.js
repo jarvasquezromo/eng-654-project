@@ -5,9 +5,13 @@ import { loadSettings, saveSettings, contourPoses, candidatesAlong, centerOf, re
 import { drawTask, orientOptions, bindSettings, branchName, BR_COLORS, REASON_COLORS } from '../taskui.js';
 import { linePlot } from '../plot.js';
 import { fmt, fmtSci, deg } from '../math.js';
+import { useSupplied, solveVerified } from '../supplied.js';
+import { mountIkSource } from '../ikui.js';
+import { tool0Of } from '../tasks.js';
 
 mountChrome();
 mountTabs();
+mountIkSource();
 
 const S = loadSettings();
 const state = { which: 'A', pick: 0, k: 0, poses: [], cands: [], starts: [], path: null, playing: false };
@@ -26,10 +30,20 @@ function draw() {
 }
 
 // Evaluate the current placement: candidates, start configurations and their outcome
-function evaluate() {
+let job = 0;
+async function evaluate() {
+  const id = ++job;
   saveSettings(S);
-  state.poses = contourPoses(S, centerOf(S, S.center), orient());
-  state.cands = candidatesAlong(S, state.poses);
+  const poses = contourPoses(S, centerOf(S, S.center), orient());
+  let cands = null; state.src = 'browser IK';
+  if (await useSupplied()) {
+    try { const { sols, stats } = await solveVerified(poses.map((T) => tool0Of(S, T))); cands = candidatesAlong(S, poses, { provider: (T0, k) => sols[k] }); state.src = `supplied · ${stats.accepted}/${stats.returned} verified`; }
+    catch (e) { state.src = `supplied failed (${e.message}), browser IK`; }
+  }
+  if (!cands) cands = candidatesAlong(S, poses);
+  if (id !== job) return;
+  state.poses = poses;
+  state.cands = cands;
   const counts = state.cands.map((c) => c.length);
   const aware = counts.every((n) => n > 0) ? branchAwareFeasible(S, state.cands) : [];
   state.starts = [];
@@ -54,7 +68,7 @@ function evaluate() {
 function report(counts) {
   const nOk = state.starts.filter((s) => s.r.ok).length, nAw = state.starts.filter((s) => s.aware).length;
   $('#checkTiles').innerHTML = [
-    ['orientation', state.which], ['min #IK on contour', Math.min(...counts)],
+    ['IK source', state.src], ['orientation', state.which], ['min #IK on contour', Math.min(...counts)],
     ['starts at s = 0', state.starts.length], ['nearest feasible', `${nOk}`], ['branch-aware feasible', `${nAw}`],
     ['max FK residual', fmtSci(Math.max(0, ...state.cands.flat().map((c) => Math.max(c.position_error, c.rotation_error))))],
   ].map(([k, x]) => `<div class="tile"><small>${k}</small><b>${x}</b></div>`).join('');
@@ -106,4 +120,5 @@ const later = () => { clearTimeout(timer); timer = setTimeout(evaluate, 120); };
 bindSettings(document.body, S, { onInput: () => { saveSettings(S); draw(); }, onChange: later });
 
 viewer.load().then(() => { $('#status').hidden = true; viewer.setOpacity(1); evaluate(); });
+window.addEventListener('ik-source', () => evaluate());
 renderMath();

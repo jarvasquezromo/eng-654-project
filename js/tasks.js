@@ -62,16 +62,23 @@ export function gridCenters(S) {
 // For every contour sample: all IK solutions for the TCP pose (tool0 pose = TCP pose shifted back by tcp along z).
 // Each candidate: q (q1,q2,q4,q5 ∈ (−π, π], q3 shifted into its range, q6 ∈ (−π, π]), within, b (branch label index),
 // invKappa (only for candidates within limits), and the FK residuals.
-export function candidatesAlong(S, poses, { stopOnEmpty = false, samples = 64 } = {}) {
+// tool0 pose for a TCP pose (TCP = tool0 + tcp · z)
+export function tool0Of(S, T) {
+  const T0 = T.map((r) => r.slice());
+  for (let i = 0; i < 3; i++) T0[i][3] = T[i][3] - S.tcp * T[i][2];
+  return T0;
+}
+// provider(T0, k) may supply the solutions (e.g. verified answers of the supplied solver);
+// by default the browser solver is used.
+export function candidatesAlong(S, poses, { stopOnEmpty = false, samples = 64, provider = null } = {}) {
   const out = [];
-  for (const T of poses) {
-    const z = [T[0][2], T[1][2], T[2][2]], p = [T[0][3], T[1][3], T[2][3]];
-    const T0 = T.map((r) => r.slice());
-    for (let i = 0; i < 3; i++) T0[i][3] = p[i] - S.tcp * z[i];
-    const sols = solveIK(T0, { samples }).map((s) => ({
+  for (let k = 0; k < poses.length; k++) {
+    const T = poses[k], p = [T[0][3], T[1][3], T[2][3]], T0 = tool0Of(S, T);
+    const raw = provider ? provider(T0, k) : solveIK(T0, { samples });
+    const sols = raw.map((s) => ({
       q: s.q, within: s.within, b: branchIndex(s.branch), label: s.label,
       invKappa: s.within ? conditioning(pointJacobian(s.q, p), S.L).invKappa : NaN,
-      position_error: s.position_error, rotation_error: s.rotation_error,
+      position_error: s.position_error, rotation_error: s.rotation_error, source: s.source || 'browser',
     }));
     out.push(sols);
     if (stopOnEmpty && !sols.length) break;
@@ -179,9 +186,9 @@ export function branchAwareFeasible(S, cands) {
 }
 
 // One placement, both strategies, every start configuration. Compact result for maps.
-export function evaluatePlacement(S, center, orient) {
+export function evaluatePlacement(S, center, orient, provider = null) {
   const poses = contourPoses(S, center, orient);
-  const cands = candidatesAlong(S, poses, { stopOnEmpty: true });
+  const cands = candidatesAlong(S, poses, { stopOnEmpty: true, provider });
   const counts = cands.map((c) => c.length);
   if (cands.length < poses.length || counts.some((n) => n === 0)) {
     return { noik: true, minCount: 0, starts: [], firstEmpty: counts.findIndex((n) => n === 0) };

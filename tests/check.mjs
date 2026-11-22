@@ -154,6 +154,19 @@ check(`JS IK round trip, fraction of q not recovered (${miss}/${NRT})`, miss / N
   check('Tool point on the base axis, vertical tool: flagged as a continuous family', fam.continuum ? 0 : 1, 0);
 }
 
+// 5h. Verification of supplied-solver answers (no helper needed): good configurations pass with the same
+//     branch labels as the browser IK, a corrupted one is rejected, a solver error falls back to browser IK
+{
+  const { verify, newStats } = await import('../js/supplied.js');
+  const q0 = randQ(), T = poeFK(q0), mine = solveIK(T), st = newStats();
+  const fake = { solutions: [...mine.map((s) => ({ q: s.q, within_limits: s.within })), { q: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6], within_limits: true }] };
+  const out = verify(T, fake, st);
+  const labelsOk = out.every((o, i) => o.label === mine[i].label);
+  check(`Supplied verify: ${st.accepted} accepted, ${st.rejected} rejected (expect ${mine.length}, 1), labels match`, st.accepted === mine.length && st.rejected === 1 && labelsOk ? 0 : 1, 0);
+  const fb = verify(T, { error: 'polynomial roots unresolved at 320 bits' }, st);
+  check('Supplied verify: solver error → browser-IK fallback for that pose', fb.length === mine.length && st.fallback === 1 ? 0 : 1, 0);
+}
+
 // 6. Reference configuration is regular
 const c = conditioning(toolJacobian(REFERENCE_Q));
 console.log(`INFO  reference q: sigma_min=${c.sigmaMin.toFixed(4)} kappa=${c.kappa.toFixed(2)} det=${c.det.toExponential(3)}`);

@@ -141,7 +141,7 @@ a.pcard:hover { border-color: var(--red); }
   .work { grid-template-columns: 1fr; height: auto; }
   .view { height: 58vh; border-right: 0; border-bottom: 1px solid var(--line); }
   .panel-body { overflow: visible; }
-  .top-links a:first-child { display: none; }
+  .top-links a[href*="project_1A"] { display: none; }
 }
 
 /* ---------- floating joint dock over the viewer */
@@ -272,3 +272,12 @@ table.starts tr.sel td { background: #e9fbff; }
 .slider.num-row { grid-template-columns: 90px 1fr 64px; }
 .numbox { width: 100%; min-height: 28px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 5px; font: inherit; font-size: 12.5px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); background: #fff; }
 @media (max-width: 980px) { .slider.num-row { grid-template-columns: 78px 1fr 64px; } }
+
+/* IK source chip and popover */
+.ik-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 14px; background: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ik-pop { position: fixed; top: 62px; right: 16px; z-index: 50; width: min(420px, calc(100vw - 24px)); background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.12); padding: 14px; font-size: 12.5px; display: flex; flex-direction: column; gap: 8px; }
+.ik-pop[hidden] { display: none; }
+.ik-pop label { display: flex; gap: 8px; align-items: flex-start; }
+.ik-pop .ok { color: #1f8a4c; font-weight: 600; } .ik-pop .bad { color: #c62828; font-weight: 600; }
+.ik-pop code { font-size: 11px; word-break: break-all; }
+@media (max-width: 980px) { .top-links .ik-chip { font-size: 11px; padding: 2px 8px; } }

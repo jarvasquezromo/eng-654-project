@@ -212,3 +212,12 @@ export function branchIndex({ shoulder, elbow, wrist }) {
 export function branchLabel({ shoulder, elbow, wrist }) {
   return `${shoulder === 1 ? 'Front' : 'Back'} · ${elbow === 1 ? 'q₃ > q₃*' : 'q₃ < q₃*'} · ${wrist === 1 ? 'q₅ ≥ 0' : 'q₅ < 0'}`;
 }
+
+// Branch labels for a configuration that came from elsewhere (e.g. the supplied solver):
+// shoulder = does q1 point at the wrist point O4, elbow = side of q3* = −β, wrist = sign of q5.
+export function classifyBranch(q) {
+  const q2 = q[1], q3 = q[2], cs = Math.cos(q3), sn = Math.sin(q3);
+  const Vr = D4 * cs + A3 * sn, Vh = A2 - D4 * sn + A3 * cs;
+  const r = Vr * Math.cos(q2) + Vh * Math.sin(q2); // radial coordinate of O4 along the q1 direction
+  return { shoulder: r >= 0 ? 1 : -1, elbow: wrap(q3 + BETA) >= 0 ? 1 : -1, wrist: q[4] >= 0 ? 1 : -1 };
+}

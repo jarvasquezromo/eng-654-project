@@ -1,2 +1,5 @@
 node_modules/
 .DS_Store
+
+# supplied solver binaries are not committed (course material)
+tools/ik-helper/solver/

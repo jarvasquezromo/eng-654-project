@@ -106,12 +106,13 @@ export function buildGofaAtlas(approach = 'down', n = 181) {
 // tagged with its sheet id and its plot coordinates (a, b) there.
 export function solveTarget(approach, rho, z, opts = {}) { return solvePoint(approach, [rho, 0, z], opts); }
 // Same, for any 3-D tool point (the count only depends on ρ and z)
+// tool0 pose with z6 = v and x6 horizontal (direction set by yaw)
+export function verticalPose(approach, p, yaw = 0) {
+  const v = APPROACH[approach].v, x6 = [Math.cos(yaw), Math.sin(yaw), 0], y6 = cross(v, x6);
+  return homog([[x6[0], y6[0], v[0]], [x6[1], y6[1], v[1]], [x6[2], y6[2], v[2]]], p);
+}
 export function solvePoint(approach, p, { yaw = 0 } = {}) {
-  const v = APPROACH[approach].v;
-  // tool frame: z6 = v, x6 = horizontal direction set by yaw
-  const x6 = [Math.cos(yaw), Math.sin(yaw), 0], z6 = v, y6 = cross(z6, x6);
-  const R = [[x6[0], y6[0], z6[0]], [x6[1], y6[1], z6[1]], [x6[2], y6[2], z6[2]]];
-  const S = solveIK(homog(R, p)), out = S.map((s) => ({ q: s.q, within: s.within, family: s.family, ...sheetOf(s.q), det: detJ(s.q) }));
+  const S = solveIK(verticalPose(approach, p, yaw)), out = S.map((s) => ({ q: s.q, within: s.within, family: s.family, ...sheetOf(s.q), det: detJ(s.q) }));
   out.continuum = !!S.continuum;
   return out;
 }

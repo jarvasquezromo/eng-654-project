@@ -4,16 +4,20 @@ import { loadSettings, saveSettings, gridCenters, REASONS, REASON_TEXT } from '.
 import { bindSettings, branchName, orientName, REASON_COLORS } from '../taskui.js';
 import { BRANCHES } from '../ik.js';
 import { makePool } from '../pool.js';
+import { useSupplied, solveVerified, statsHTML, getSource } from '../supplied.js';
+import { mountIkSource } from '../ikui.js';
+import { contourPoses, centerOf, tool0Of } from '../tasks.js';
 
 mountChrome();
 mountTabs();
+mountIkSource();
 
 const S = loadSettings();
 const pool = makePool();
 const state = { which: 'A', mode: 'reason', branch: 'all', probe: null };
 const cache = {}; // key → { results: [], done }
 const orient = () => (state.which === 'A' ? S.orientA : S.orientB);
-const keyOf = (o) => JSON.stringify([o, S.a, S.b, S.tilt, S.spin, S.N, S.tcp, S.z, S.xRange, S.yRange, S.gridN, S.dqMax, S.margin, S.L]);
+const keyOf = (o) => `${o}|${JSON.stringify([getSource(), S.a, S.b, S.tilt, S.spin, S.N, S.tcp, S.z, S.xRange, S.yRange, S.gridN, S.dqMax, S.margin, S.L])}`;
 
 $('#branch').innerHTML = '<option value="all">All start branches</option>' + BRANCHES.map((b, i) => `<option value="${i}">Start on ${branchName(i)}</option>`).join('');
 $('#mode').onchange = (e) => { state.mode = e.target.value; paintAll(); };
@@ -34,7 +38,21 @@ async function run() {
   $('#progress').hidden = false;
   let got = 0, lastPaint = 0;
   const t0 = performance.now();
-  const ok = await pool.run(S, o, centers.map((xy, i) => ({ i, xy })), (i, r) => {
+  // With the helper on: all contour poses of all placements go to the supplied solver in one batch,
+  // every answer is verified with our FK, and the workers evaluate those candidates.
+  const jobs = centers.map((xy, i) => ({ i, xy }));
+  entry.source = 'browser IK';
+  if (await useSupplied()) {
+    try {
+      const poses = centers.map((xy) => contourPoses(S, centerOf(S, xy), o).map((T) => tool0Of(S, T))).flat();
+      $('#progress').textContent = `Supplied solver: ${poses.length} poses…`;
+      const { sols, stats } = await solveVerified(poses, { chunk: 8000, onProgress: (d, n) => { $('#progress').textContent = `Supplied solver: ${d} / ${n} poses`; } });
+      if (current !== entry) return;
+      jobs.forEach((j, i) => { j.sols = sols.slice(i * S.N, (i + 1) * S.N); });
+      entry.source = 'supplied'; entry.stats = stats; entry.solverSeconds = (performance.now() - t0) / 1000;
+    } catch (e) { entry.source = `browser IK (supplied failed: ${e.message})`; }
+  }
+  const ok = await pool.run(S, o, jobs, (i, r) => {
     if (current !== entry) return;
     entry.results[i] = r; got++;
     $('#progress').textContent = `Placements ${got} / ${centers.length} · ${pool.size} worker${pool.size > 1 ? 's' : ''}`;
@@ -151,8 +169,9 @@ function summary() {
   const feasA = R.filter((r) => !r.noik && r.starts.some((s) => s.aware.ok)).length;
   const tally = Object.fromEntries(REASONS.map((k) => [k, 0]));
   R.forEach((r) => r.starts.forEach((s) => { tally[s.nearest.reason]++; }));
-  const other = Object.values(cache).find((x) => x.done && x !== e && x.key.slice(x.key.indexOf(',')) === e.key.slice(e.key.indexOf(',')));
+  const other = Object.values(cache).find((x) => x.done && x !== e && x.key.split('|')[1] === e.key.split('|')[1]);
   const pct = (x) => `${Math.round((100 * x) / n)}%`;
+  $('#srcTiles').innerHTML = e.stats ? statsHTML(e.stats, e.solverSeconds) : `<div class="tile"><small>IK source</small><b>${e.source}</b></div>`;
   $('#sumTiles').innerHTML = [
     ['placements', n], ['no IK somewhere', pct(noik)], ['feasible · nearest', pct(feasN)], ['feasible · branch-aware', pct(feasA)],
     ...(other ? [[`other orientation (${orientName(other.orient)}) · aware`, pct(other.results.filter((r) => !r.noik && r.starts.some((s) => s.aware.ok)).length)]] : []),
@@ -200,5 +219,6 @@ new ResizeObserver(() => paintMap()).observe($('#heat'));
 new ResizeObserver(() => { if (current) minimaps(); }).observe($('#minimaps'));
 $$('.tabs').forEach((t) => t.addEventListener('tab', (e) => { if (e.detail === 'br' && current) requestAnimationFrame(minimaps); }));
 
+window.addEventListener('ik-source', () => run());
 run();
 renderMath();

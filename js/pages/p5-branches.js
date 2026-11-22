@@ -6,9 +6,13 @@ import { drawTask, branchName, TRACK_COLORS, orientName } from '../taskui.js';
 import { poeFK, poseError, LIMITS } from '../gofa.js';
 import { homog, quatToR, deg, rad, fmt, fmtSci } from '../math.js';
 import { linePlot } from '../plot.js';
+import { useSupplied, solveVerified, statsHTML } from '../supplied.js';
+import { mountIkSource } from '../ikui.js';
+import { tool0Of } from '../tasks.js';
 
 mountChrome();
 mountTabs();
+mountIkSource();
 
 const S = loadSettings();
 const state = { which: 'A', k: 0, joint: 0, sel: 0, cands: [], branches: [], playing: false };
@@ -22,10 +26,25 @@ $$('#jointSeg button').forEach((b) => (b.onclick = () => { state.joint = b.datas
 // unwrap a branch so its curve is continuous (degrees)
 const unwrapped = (br) => { const out = [br.q[0].slice()]; for (let i = 1; i < br.q.length; i++) out.push(out[i - 1].map((x, j) => x + wrap(br.q[i][j] - x))); return out; };
 
-function compute() {
+// IK candidates from the supplied solver (verified with our FK) when the local helper is on, else browser IK
+async function candidatesFor(poses) {
+  if (await useSupplied()) {
+    try {
+      const t0 = performance.now(), { sols, stats } = await solveVerified(poses.map((T) => tool0Of(S, T)));
+      $('#srcTiles').innerHTML = statsHTML(stats, (performance.now() - t0) / 1000);
+      return candidatesAlong(S, poses, { provider: (T0, k) => sols[k] });
+    } catch (e) { $('#srcTiles').innerHTML = `<div class="tile"><small>supplied solver</small><b>failed: ${e.message}</b></div>`; }
+  } else $('#srcTiles').innerHTML = '<div class="tile"><small>source</small><b>browser IK (js/ik.js)</b></div>';
+  return candidatesAlong(S, poses);
+}
+let job = 0;
+async function compute() {
+  const id = ++job;
   const poses = contourPoses(S, centerOf(S, S.center), orient());
+  const cands = await candidatesFor(poses);
+  if (id !== job) return;
   state.poses = poses;
-  state.cands = candidatesAlong(S, poses);
+  state.cands = cands;
   state.branches = trackBranches(state.cands, { gate: 1.5 * rad(S.dqMax), closed: true });
   state.branches.forEach((br) => {
     br.uq = unwrapped(br);
@@ -129,4 +148,5 @@ $$('#orientBtns button').forEach((b) => (b.onclick = () => { state.which = b.dat
 $$('#views button').forEach((b) => (b.onclick = () => viewer.view(b.dataset.v)));
 
 viewer.load().then(() => { $('#status').hidden = true; viewer.setOpacity(1); compute(); });
+window.addEventListener('ik-source', () => compute());
 renderMath();
