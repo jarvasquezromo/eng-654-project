@@ -21,15 +21,16 @@ Each part of the assignment gets its own page: a 3D view (or map) plus one side 
 ## Using the supplied IK solver (local helper)
 
 The pages run anywhere with the browser IK (`js/ik.js`). To use the course's `crb15000-ik` instead, as the
-assignment asks, run the helper on your computer; the site (GitHub Pages or a local copy) then talks to it
-on `http://127.0.0.1:8654`:
+assignment asks, start the helper on your computer with one command. The course solver for Linux and
+Windows (x86_64) is included in `tools/ik-helper/solver/` and picked automatically:
 
 ```sh
-# Linux (glibc ≥ 2.38)
-python3 tools/ik-helper/ik_helper.py --solver ~/Downloads/abbGofa_ik/crb15000-ik-linux-x86_64/crb15000-ik
-# Windows
-py tools\ik-helper\ik_helper.py --solver C:\path\to\crb15000-ik-windows-x86_64\crb15000-ik.exe
+python3 tools/ik-helper/ik_helper.py        # Linux (glibc ≥ 2.38)
+py tools\ik-helper\ik_helper.py            # Windows
 ```
+
+To use another build (for example one compiled from the course's Rust source on macOS), pass
+`--solver PATH` or set `CRB15000_IK=PATH`. The helper listens on `http://127.0.0.1:8654`.
 
 Then click **IK: browser** at the top right of Steps 5–7 or the atlas and choose **Supplied solver**.
 What happens:
@@ -43,7 +44,7 @@ What happens:
   that pose falls back to the browser IK and is counted, so a solver failure is never reported as loss of IK.
 - Works in Chrome, Edge and Firefox (localhost is allowed from an https page; the helper sends the
   private-network CORS header). Safari may block it. The phone cannot use it: the helper runs on a computer.
-- The solver binaries are course material and are not committed (`tools/ik-helper/solver/` is ignored).
+- The bundled binaries are the course's `crb15000-ik` builds, unchanged (checksums in `SHA256SUMS.txt`).
 
 On the default study both solvers return exactly the same configurations (83,608 of 83,608 on the
 14,414 poses both solve, none found by only one).
@@ -103,7 +104,7 @@ js/feas-worker.js     web worker that evaluates placements for the Step 7 maps (
 js/taskui.js, plot.js drawing helpers for Steps 5–7
 js/supplied.js        supplied-solver client: helper calls, FK verification, periodic resolution, fallback
 js/ikui.js            the “IK source” switch in the header
-tools/ik-helper/      local helper that runs crb15000-ik for the pages
+tools/ik-helper/      local helper that runs crb15000-ik for the pages (solver/ holds the Linux and Windows builds)
 js/viewer.js          three.js viewer (STL meshes on the URDF chain)
 js/ui.js              header, steps, tabs, sliders
 js/pages/             page scripts

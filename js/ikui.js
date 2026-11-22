@@ -20,7 +20,7 @@ export function mountIkSource() {
       <label><input type="radio" name="iks" value="browser" ${src === 'browser' ? 'checked' : ''}> Browser solver (js/ik.js), works everywhere</label>
       <label><input type="radio" name="iks" value="supplied" ${src === 'supplied' ? 'checked' : ''}> Supplied <code>crb15000-ik</code> through the local helper</label>
       <p class="${st.ok ? 'ok' : 'bad'}">${st.ok ? `Helper connected at ${helperURL()} · ${st.solver} · ${st.threads} threads` : `Helper not reachable at ${helperURL()}`}</p>
-      <p class="note">Start it on this computer, then press Check:<br><code>python3 tools/ik-helper/ik_helper.py --solver path/to/crb15000-ik</code><br>Every returned configuration is re-checked with our own FK before use. Steps 5–7 and the atlas IK panel use it; the large maps of Step 4 keep the browser solver.</p>
+      <p class="note">Start it on this computer from the repo folder (the solver is included), then press Check:<br><code>python3 tools/ik-helper/ik_helper.py</code> (Linux) · <code>py tools\\ik-helper\\ik_helper.py</code> (Windows)<br>Add <code>--solver PATH</code> to use another build.<br>Every returned configuration is re-checked with our own FK before use. Steps 5–7 and the atlas IK panel use it; the large maps of Step 4 keep the browser solver.</p>
       <div class="row"><button data-act="check">Check</button><button data-act="close">Close</button></div>`;
     pop.querySelectorAll('input[name=iks]').forEach((r) => (r.onchange = () => { setSource(r.value); refresh(true); }));
     pop.querySelector('[data-act=check]').onclick = () => refresh(true);

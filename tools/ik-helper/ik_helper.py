@@ -2,10 +2,12 @@
 """Local helper: lets the GoFa lab pages (GitHub Pages or a local copy) use the supplied
 crb15000-ik solver, which cannot run inside a browser.
 
-    python3 tools/ik-helper/ik_helper.py --solver /path/to/crb15000-ik      (Linux)
-    py tools\\ik-helper\\ik_helper.py --solver C:\\path\\to\\crb15000-ik.exe   (Windows)
+    python3 tools/ik-helper/ik_helper.py          (Linux x86_64, glibc >= 2.38)
+    py tools\\ik-helper\\ik_helper.py             (Windows x86_64)
 
-Then open the site and switch "IK source" (top right) to "Supplied solver".
+The course solver for both platforms is in tools/ik-helper/solver/ and is picked automatically.
+To use another build (e.g. one compiled from the Rust source on macOS), pass --solver PATH or set
+CRB15000_IK. Then open the site and switch "IK" (top right) to "Supplied solver".
 Only the standard library is used. The server listens on 127.0.0.1 only.
 
 Endpoints
@@ -31,15 +33,27 @@ MAX_POSES = 100_000
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def find_solver(explicit):
-    exe = "crb15000-ik.exe" if platform.system() == "Windows" else "crb15000-ik"
-    candidates = [explicit, os.environ.get("CRB15000_IK"), os.path.join(HERE, "solver", exe), os.path.join(os.getcwd(), exe)]
-    candidates += glob.glob(os.path.join(os.getcwd(), "**", exe), recursive=True)[:5]
-    candidates += glob.glob(os.path.join(os.path.expanduser("~"), "*", "abbGofa_ik", "*", exe))[:5]
-    for c in candidates:
-        if c and os.path.isfile(c):
-            return os.path.abspath(c)
+def bundled_solver():
+    """The course binary shipped in this repo for the current platform, or None."""
+    system, machine = platform.system(), platform.machine().lower()
+    if machine not in ("x86_64", "amd64"):
+        return None
+    if system == "Linux":
+        return os.path.join(HERE, "solver", "linux-x86_64", "crb15000-ik")
+    if system == "Windows":
+        return os.path.join(HERE, "solver", "windows-x86_64", "crb15000-ik.exe")
     return None
+
+
+def find_solver(explicit):
+    # 1) --solver PATH, 2) CRB15000_IK, 3) the binary bundled in tools/ik-helper/solver/
+    for name, c in (("--solver", explicit), ("CRB15000_IK", os.environ.get("CRB15000_IK"))):
+        if c:
+            if not os.path.isfile(c):
+                sys.exit(f"{name} {c}: file not found")
+            return os.path.abspath(c)
+    c = bundled_solver()
+    return os.path.abspath(c) if c and os.path.isfile(c) else None
 
 
 def origin_allowed(origin):
@@ -118,19 +132,25 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--solver", help="path to crb15000-ik (or crb15000-ik.exe)")
+    ap.add_argument("--solver", help="use another crb15000-ik build instead of the bundled one")
     ap.add_argument("--port", type=int, default=8654)
     ap.add_argument("--threads", type=int, default=max(1, (os.cpu_count() or 2)))
     a = ap.parse_args()
     solver = find_solver(a.solver)
     if not solver:
-        sys.exit("crb15000-ik not found: pass --solver PATH (or set CRB15000_IK, or copy it into tools/ik-helper/solver/)")
+        sys.exit(f"No bundled crb15000-ik for {platform.system()} {platform.machine()} (bundled: Linux and Windows x86_64).\n"
+                 "Build it from the course's Rust source (cargo build --release --locked) and pass --solver PATH.")
     if platform.system() != "Windows" and not os.access(solver, os.X_OK):
         os.chmod(solver, os.stat(solver).st_mode | 0o111)
     Handler.solver, Handler.threads = solver, a.threads
-    probe = subprocess.run([solver, "solve-pose"], input='{"pose":[0.571,0,0.899,0.7071067811865476,0,0.7071067811865476,0]}', capture_output=True, text=True)
-    if probe.returncode != 0:
-        sys.exit(f"solver did not run: {probe.stderr.strip()[:300]}")
+    try:
+        probe = subprocess.run([solver, "solve-pose"], input='{"pose":[0.571,0,0.899,0.7071067811865476,0,0.7071067811865476,0]}', capture_output=True, text=True)
+        ok, msg = probe.returncode == 0, probe.stderr.strip()[:300]
+    except OSError as e:
+        ok, msg = False, str(e)
+    if not ok:
+        hint = " (the Linux build needs glibc 2.38 or newer; otherwise build from source and pass --solver)" if platform.system() == "Linux" else ""
+        sys.exit(f"solver did not run: {msg}{hint}")
     print(f"crb15000-ik helper: {solver}\nlistening on http://127.0.0.1:{a.port}  ({a.threads} solver threads)  Ctrl+C to stop")
     ThreadingHTTPServer(("127.0.0.1", a.port), Handler).serve_forever()
 

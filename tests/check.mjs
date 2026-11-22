@@ -167,6 +167,17 @@ check(`JS IK round trip, fraction of q not recovered (${miss}/${NRT})`, miss / N
   check('Supplied verify: solver error → browser-IK fallback for that pose', fb.length === mine.length && st.fallback === 1 ? 0 : 1, 0);
 }
 
+// 5i. The bundled crb15000-ik (Linux x86_64) reproduces the stored example output
+if (process.platform === 'linux' && process.arch === 'x64') {
+  const { execFileSync } = await import('node:child_process');
+  let out = null;
+  try { out = JSON.parse(execFileSync(new URL('../tools/ik-helper/solver/linux-x86_64/crb15000-ik', import.meta.url).pathname, ['solve-pose'], { input: '{"pose":[0.571,0,0.899,0.7071067811865476,0,0.7071067811865476,0]}' }).toString()); } catch { /* old glibc etc. */ }
+  if (out) {
+    const e = Math.max(...ik.solutions.map((s) => Math.min(...out.solutions.map((o) => sameQ(o.q, s.q)))));
+    check(`Bundled crb15000-ik reproduces data/ik-example.json (${out.solutions.length} solutions)`, out.solutions.length === ik.solutions.length ? e : 1, 1e-12);
+  } else console.log('SKIP  bundled crb15000-ik could not run here');
+}
+
 // 6. Reference configuration is regular
 const c = conditioning(toolJacobian(REFERENCE_Q));
 console.log(`INFO  reference q: sigma_min=${c.sigmaMin.toFixed(4)} kappa=${c.kappa.toFixed(2)} det=${c.det.toExponential(3)}`);
