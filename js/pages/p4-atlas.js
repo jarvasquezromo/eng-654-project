@@ -6,7 +6,9 @@ import { buildGofaAtlas, solvePoint, sheetConfig, meridianOf, wrap, Q3_FORBIDDEN
 import { fmt, rpy, rad } from '../math.js';
 import { solveTool, toolPose } from '../tool-atlas.js';
 import { sheetOf, detJ, verticalPose } from '../gofa-atlas.js';
-import { useSupplied, solveVerified } from '../supplied.js';
+import { useSupplied, solveVerified, solveRaw, verify, newStats, helperStatus } from '../supplied.js';
+import { planePoint } from '../tool-atlas.js';
+import { solveIK } from '../ik.js';
 import { mountIkSource } from '../ikui.js';
 
 mountChrome();
@@ -19,7 +21,7 @@ const SHEET_COLORS = { A: '#141414', B: '#1f5fa8', U: '#1f8a4c', D: '#e8590c' };
 const COUNT_FILL = ['#ffffff', '#f6f8fc', '#eef3fb', '#e6eefa', '#dde8f8', '#d3e2f7', '#c9dbf5', '#bfd4f3', '#b5cdf1', '#abc6ef', '#a1bfed', '#97b8eb', '#8db1e9', '#83aae7', '#79a3e5', '#6f9ce3', '#6595e1'];
 // target is a 3-D tool point p = [x, y, z]; the workspace view is the meridian (ρ, z) or a Cartesian plane
 const state = { ap: 'down', A: null, target: null, sols: [], sel: 0, limits: false, regions: true, regionData: null, plane: 'rz', offset: { xy: 0.35, xz: 0, yz: 0.3 },
-  tool: { key: 'down', rpy: [0, 180, 0], len: 0 }, num: null };
+  tool: { key: 'down', rpy: [0, 180, 0], len: 0 }, num: null, mapSrc: 'browser', sup: null };
 // ---------------------------------------------------------------- tool
 // Orientation R = Rz(yaw) Ry(pitch) Rx(roll) and length ℓ along the tool z axis (TCP = tool0 + ℓ z6).
 // A vertical tool axis keeps the exact (ρ, z) atlas; any other orientation switches to the numerical map.
@@ -377,10 +379,12 @@ function paintAll() {
   $('.quad').classList.toggle('two', !exact());
   $('#qTitle').textContent = exact() ? 'Joint space · four sheets' : 'Joint space · footprint of the plane';
   $('#qSub').textContent = exact() ? 'det J on each sheet, zero set in black' : 'every IK solution of the plane at (q₂, q₃), coloured by det J';
-  if (exact()) { state.A.sheets.forEach((sh) => paintSheet(`#s${sh.id}`, sh)); paintW(); }
-  else { paintWristNum('#sA', 1); paintWristNum('#sB', -1); paintWNum(); }
+  if (exact()) state.A.sheets.forEach((sh) => paintSheet(`#s${sh.id}`, sh));
+  else { computeNum(); paintWristNum('#sA', 1); paintWristNum('#sB', -1); }
+  if (state.mapSrc === 'supplied') paintWSup(); else if (exact()) paintW(); else paintWNum();
 }
 function legend() {
+  if (state.mapSrc === 'supplied') return legendSup();
   if (!exact()) return legendNum();
   const [x, y, z] = state.target, r = Math.hypot(x, y), nc = state.A.sheets.reduce((a, s) => a + s.cusps.length, 0);
   $('#legend').innerHTML = `<span><b>${APPROACH[state.ap].name}${state.tool.len ? ` · ℓ = ${state.tool.len.toFixed(2)} m` : ''}</b></span><span>critical curves of sheet ${state.A.sheets.map((sh) => `<span class="dot" style="background:${SHEET_COLORS[sh.id]}"></span>${sh.id}`).join(' ')}</span><span><span class="dot" style="background:#ff0000"></span>cusp (${nc} found)</span><span>◎ (${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}) m · ρ = ${r.toFixed(3)} m</span><span><b>${shown().length} IK solutions</b>${state.limits ? ' within limits' : ''}</span>${state.regions ? '<span>numbers: IK count per region</span>' : ''}`;
@@ -390,11 +394,11 @@ function legend() {
 // Plane grid solved point by point in web workers: IK count per pixel, and every solution's (q2, q3),
 // wrist sign and det J for the joint-space footprint.
 let workers = [];
-function planeGrid() {
-  const P = planeDef(), res = window.matchMedia('(max-width: 980px)').matches ? 70 : 90;
+function planeGrid(resOverride) {
+  const P = planeDef(), res = resOverride || (window.matchMedia('(max-width: 980px)').matches ? 70 : 90);
   const step = (P.uR[1] - P.uR[0]) / res, nv = Math.round((P.vR[1] - P.vR[0]) / step);
-  const ui = { xy: 0, xz: 0, yz: 1 }[state.plane], vi = { xy: 1, xz: 2, yz: 2 }[state.plane];
-  return { u0: P.uR[0], v0: P.vR[0], step, nu: res, nv, ui, vi, n: P.n, h: P.h };
+  const ui = { xy: 0, xz: 0, yz: 1, rz: 0 }[state.plane], vi = { xy: 1, xz: 2, yz: 2, rz: 2 }[state.plane];
+  return { u0: P.uR[0], v0: P.vR[0], step, nu: res, nv, ui, vi, n: P.n < 0 ? 1 : P.n, h: P.n < 0 ? 0 : P.h };
 }
 function computeNum() {
   const G = planeGrid(), key = JSON.stringify([state.tool, state.plane, G.h, G.nu]);
@@ -426,25 +430,32 @@ function computeNum() {
 }
 function paintWNum() {
   computeNum();
+  const N = state.num;
+  paintRaster({ G: N.G, all: N.all, cnt: state.limits ? N.inl : N.all, done: N.done, sub: `browser IK · ${N.G.nu} × ${N.G.nv} points · boundaries = count changes` });
+}
+// Count map on the plane grid. Values: n ≥ 0 count, 255 continuous family, −1 solver gave up, −2 not yet computed.
+function paintRaster({ G, all, cnt, done, sub, extra }) {
   const cv = $('#wc'), { ctx, W, H } = setup(cv), F = wFrame(W, H); gw = F;
-  const N = state.num, G = N.G, cnt = state.limits ? N.inl : N.all, px = G.step * F.sc;
+  const px = G.step * F.sc;
   const X = (i) => F.x0 + i * px, Y = (j) => F.y0 + F.h - (j + 1) * px;
-  const filled = (k) => Math.floor(k / G.nu) < N.rows || N.done;
   for (let j = 0; j < G.nv; j++) for (let i = 0; i < G.nu; i++) {
-    const k = j * G.nu + i;
-    ctx.fillStyle = state.regions ? (cnt[k] === 255 ? '#141414' : COUNT_FILL[Math.min(cnt[k], 16)]) : '#f7f9fc';
+    const k = j * G.nu + i, c = cnt[k];
+    ctx.fillStyle = c === -2 ? '#ffffff' : c === -1 ? '#d0d0d0' : !state.regions ? '#f7f9fc' : c === 255 ? '#141414' : COUNT_FILL[Math.min(c, 16)];
     ctx.fillRect(X(i), Y(j), px + 0.6, px + 0.6);
+    if (c === -1) { ctx.strokeStyle = '#8a8a8a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(i), Y(j) + px); ctx.lineTo(X(i) + px, Y(j)); ctx.stroke(); }
   }
   // critical curves ≈ where the IK count changes between neighbouring points
   ctx.strokeStyle = '#141414'; ctx.lineWidth = 1.3; ctx.beginPath();
   for (let j = 0; j < G.nv; j++) for (let i = 0; i < G.nu; i++) {
     const k = j * G.nu + i;
-    if (i + 1 < G.nu && N.all[k] !== N.all[k + 1]) { ctx.moveTo(X(i + 1), Y(j)); ctx.lineTo(X(i + 1), Y(j) + px); }
-    if (j + 1 < G.nv && N.all[k] !== N.all[k + G.nu]) { ctx.moveTo(X(i), Y(j)); ctx.lineTo(X(i) + px, Y(j)); }
+    const ok = (m) => all[m] >= 0; // no boundary next to pending or failed points
+    if (i + 1 < G.nu && ok(k) && ok(k + 1) && all[k] !== all[k + 1]) { ctx.moveTo(X(i + 1), Y(j)); ctx.lineTo(X(i + 1), Y(j) + px); }
+    if (j + 1 < G.nv && ok(k) && ok(k + G.nu) && all[k] !== all[k + G.nu]) { ctx.moveTo(X(i), Y(j)); ctx.lineTo(X(i) + px, Y(j)); }
   }
   ctx.stroke();
   // labels: one per connected region of equal count, at its deepest pixel
-  if (state.regions && N.done) {
+  extra?.(ctx, F, X, Y, px);
+  if (state.regions && done) {
     const lab = new Int32Array(G.nu * G.nv).fill(-1);
     ctx.font = '600 11px Inter, Arial'; ctx.textAlign = 'center';
     for (let s0 = 0; s0 < lab.length; s0++) {
@@ -458,7 +469,7 @@ function paintWNum() {
           const u = ny * G.nu + nx; if (lab[u] < 0 && cnt[u] === cnt[s0]) { lab[u] = s0; stack.push(u); }
         }
       }
-      if (pix.length < 40) continue;
+      if (pix.length < 40 || cnt[s0] < 0) continue;
       let best = pix[0], bd = -1;
       for (const t of pix) {
         const x = t % G.nu, y = (t / G.nu) | 0; let d = 0;
@@ -485,8 +496,69 @@ function paintWNum() {
   ctx.textAlign = 'right';
   ticks(F.z0, F.z1).forEach((z) => ctx.fillText(+z.toFixed(3) + '', F.x0 - 4, F.Y(z) + 3));
   ctx.save(); ctx.translate(10, F.y0 + F.h / 2); ctx.rotate(-PI / 2); ctx.textAlign = 'center'; ctx.fillText(`${F.P.vName} [m]`, 0, 0); ctx.restore(); ctx.textAlign = 'left';
-  $('#wTitle').textContent = `Plane ${state.plane} at ${AXN[F.P.n]} = ${F.P.h.toFixed(2)} m`;
-  $('#wSub').textContent = `numerical · ${G.nu} × ${G.nv} points · boundaries = count changes`;
+  $('#wTitle').textContent = state.plane === 'rz' ? 'Workspace section (ρ, z)' : `Plane ${state.plane} at ${AXN[F.P.n]} = ${F.P.h.toFixed(2)} m`;
+  $('#wSub').textContent = sub;
+}
+
+// ---------------------------------------------------------------- map from the supplied solver
+// Every grid point goes to crb15000-ik (via the helper). Our FK verifies each configuration; the count is
+// the number it returned and we accepted. Points where it gives up are hatched. Red dots: points where
+// its count differs from the browser IK (computed in parallel), so its misses are visible.
+let supJob = 0;
+const SUP_RES = 48;
+async function computeSup() {
+  // coarser grid than the browser map: on exactly vertical tools the solver uses a slow high-precision fallback
+  const G = planeGrid(SUP_RES), key = JSON.stringify(['sup', state.tool, state.plane, G.h, G.nu]);
+  if (state.sup?.key === key) return;
+  const id = ++supJob, n = G.nu * G.nv;
+  const sup = { key, G, all: new Int16Array(n).fill(-2), inl: new Int16Array(n).fill(-2), js: new Int16Array(n).fill(-2), done: false, stats: newStats(), t0: performance.now(), n };
+  state.sup = sup;
+  if (!(await helperStatus(true)).ok) { sup.offline = true; paintAll(); return; }
+  const R = toolR(), Ts = [];
+  for (let j = 0; j < G.nv; j++) for (let i = 0; i < G.nu; i++) Ts.push(toolPose(R, state.tool.len, planePoint(G, i, j)));
+  const chunk = 200;
+  $('#progress').hidden = false;
+  try {
+    for (let a = 0; a < n; a += chunk) {
+      const el = (performance.now() - sup.t0) / 1000, eta = a ? (el / a) * (n - a) : null;
+      $('#progress').textContent = `Supplied solver: ${a} / ${n} points${eta !== null ? ` · ~${Math.ceil(eta)} s left` : ''}`;
+      const res = await solveRaw(Ts.slice(a, a + chunk), { chunk });
+      if (id !== supJob) return;
+      res.forEach((r, m) => {
+        const k = a + m, out = verify(Ts[k], r, sup.stats), js = solveIK(Ts[k]);
+        sup.all[k] = r.error ? -1 : out.length; sup.inl[k] = r.error ? -1 : out.filter((x) => x.within).length;
+        sup.js[k] = js.continuum ? 255 : js.length;
+      });
+      sup.rows = a + chunk;
+      paintAll(); legend();
+    }
+  } catch (e) { sup.failed = e.message; }
+  sup.done = true; sup.seconds = (performance.now() - sup.t0) / 1000;
+  $('#progress').hidden = true;
+  paintAll(); legend();
+}
+function paintWSup() {
+  computeSup();
+  const S = state.sup;
+  if (!S || S.offline) {
+    paintRaster({ G: planeGrid(), all: new Int16Array(1).fill(-2), cnt: new Int16Array(planeGrid().nu * planeGrid().nv).fill(-2), done: false, sub: 'supplied solver: helper not reachable (IK switch, top right)' });
+    return;
+  }
+  let diff = 0;
+  paintRaster({
+    G: S.G, all: S.all, cnt: state.limits ? S.inl : S.all, done: S.done,
+    sub: `supplied crb15000-ik · ${S.G.nu} × ${S.G.nv} points${S.done ? ` · ${S.seconds.toFixed(0)} s` : ` · ${Math.min(S.rows || 0, S.n)} / ${S.n}`}`,
+    extra: (ctx, F, X, Y, px) => {
+      if (exact()) { ctx.globalAlpha = 0.35; ctx.lineWidth = 1; drawCurves(ctx, F, true); ctx.globalAlpha = 1; } // exact critical curves for reference
+      ctx.fillStyle = '#ff0000';
+      for (let k = 0; k < S.all.length; k++) {
+        if (S.all[k] < 0 || S.js[k] < 0 || S.js[k] === 255 || S.all[k] === S.js[k]) continue;
+        diff++;
+        ctx.beginPath(); ctx.arc(X(k % S.G.nu) + px / 2, Y(Math.floor(k / S.G.nu)) + px / 2, Math.max(1.4, px * 0.28), 0, 2 * PI); ctx.fill();
+      }
+    },
+  });
+  S.diff = diff;
 }
 // Joint-space footprint of the plane: every IK solution of every plane point, at its (q2, q3),
 // coloured by det J; near-singular points are dark, so the singular curves show as dark lines.
@@ -540,6 +612,10 @@ function tapWristNum(g, x, y) {
   state.target = p; solve();
   const near = shown().findIndex((s) => s.w === g.w && Math.abs(wrap(s.q[1] - best[1])) < 1e-6 && Math.abs(wrap(s.q[2] - best[2])) < 1e-6);
   if (near >= 0) { state.sel = near; render(); }
+}
+function legendSup() {
+  const S = state.sup, st = S?.stats;
+  $('#legend').innerHTML = `<span><b>Map: supplied crb15000-ik</b></span>${S?.offline ? '<span>helper not reachable: start it and press Check under “IK” (top right)</span>' : `<span>numbers: its IK count per region</span><span><span class="dot" style="background:#ff0000"></span>count differs from browser IK${S?.diff !== undefined ? ` (${S.diff} points so far)`.replace(' so far', S.done ? '' : ' so far') : ''}</span><span><span class="dot" style="background:#d0d0d0"></span>solver gave up${st ? ` (${st.errors})` : ''}</span>${st ? `<span>${st.accepted}/${st.returned} configurations verified by our FK${st.rejected ? `, ${st.rejected} rejected` : ''}</span>` : ''}`}`;
 }
 function legendNum() {
   const [x, y, z] = state.target;
@@ -623,6 +699,11 @@ $('#len').onchange = (e) => commitLen(Number(e.target.value));
 $('#lenNum').onchange = (e) => commitLen(Number(e.target.value));
 syncToolUI();
 $('#toolNote').textContent = 'Tool axis vertical (down): exact atlas, all four sheets.';
+$$('#mapSrc button').forEach((b) => (b.onclick = async () => {
+  if (b.dataset.src === 'supplied' && !(await helperStatus(true)).ok) { alert('The supplied solver needs the local helper:\n\npython3 tools/ik-helper/ik_helper.py   (Linux)\npy tools\\ik-helper\\ik_helper.py   (Windows)\n\nThen try again.'); return; }
+  state.mapSrc = b.dataset.src; $$('#mapSrc button').forEach((x) => x.classList.toggle('on', x === b));
+  paintAll(); legend();
+}));
 window.addEventListener('ik-source', () => solve());
 rebuild();
 renderMath();
