@@ -17,27 +17,28 @@
   <section class="view mapview" id="view">
     <div class="view-tools">
       <div class="group mode"><a href="04-slice.html">Joint slice</a><a href="04-plane.html">Task-space plane</a><a class="on" href="atlas.html">Topology atlas</a></div>
-      <div class="group" id="apBtns"><button data-ap="down" class="on">Tool down</button><button data-ap="up">Tool up</button></div>
+      <div class="group" id="apBtns"><button data-t="down" class="on">Tool down</button><button data-t="up">Up</button><button data-t="fwd">Forward</button><button data-t="tilt">Tilted 45°</button></div>
       <div class="group" id="planeBtns"><button data-pl="rz" class="on">ρ, z</button><button data-pl="xy">xy</button><button data-pl="xz">xz</button><button data-pl="yz">yz</button></div>
       <label class="offset" id="offBox" hidden><span id="offName">z =</span><input type="range" id="off" step="0.01"><output id="offOut"></output></label>
       <div class="group"><button id="limBtn">Joint limits</button><button id="regBtn" class="on">IK-count regions</button></div>
     </div>
     <div class="twin" id="twin">
       <div class="pane stack">
-        <div class="pane-head"><b>Joint space · four sheets</b><small>det J on each sheet, zero set in black</small></div>
+        <div class="pane-head"><b id="qTitle">Joint space · four sheets</b><small id="qSub">det J on each sheet, zero set in black</small></div>
         <div class="quad"><canvas id="sA"></canvas><canvas id="sB"></canvas><canvas id="sU"></canvas><canvas id="sD"></canvas></div>
       </div>
       <div class="pane"><div class="pane-head"><b id="wTitle">Workspace section</b><small id="wSub">ρ ≥ 0 · rotate about z for the full workspace</small></div><canvas id="wc"></canvas></div>
     </div>
+    <div class="progress" id="progress" hidden>Computing…</div>
     <div class="view-legend" id="legend"></div>
   </section>
   <aside class="panel">
     <div class="panel-head">
       <div class="eyebrow">Step 4 · Topology of GoFa's IK</div>
       <h1>Singular curves and IK counts</h1>
-      <p>The Lecture 06 atlas for GoFa itself: tool axis kept vertical, joint space on the four sheets of solutions, workspace on the meridian section \((\rho, z)\). Tap any plot to solve the full 6-joint IK.</p>
+      <p>The Lecture 06 atlas for GoFa itself. Vertical tool: exact, with joint space on the four sheets of solutions and the workspace on \((\rho, z)\) or any plane. Other tools (Tool tab): numerical map of the plane. Tap any plot to solve the full 6-joint IK.</p>
     </div>
-    <div class="tabs"><button data-tab="ik" class="active">IK</button><button data-tab="red">Reduction</button><button data-tab="read">Read</button></div>
+    <div class="tabs"><button data-tab="ik" class="active">IK</button><button data-tab="tool">Tool</button><button data-tab="red">Reduction</button><button data-tab="read">Read</button></div>
     <div class="panel-body">
       <div data-pane="ik">
         <div class="tiles" id="ikTiles"></div>
@@ -45,10 +46,25 @@
         <div class="robot3d" id="robot3d"><span class="cap" id="robotCap"></span></div>
         <div class="scroll-x" id="ikTable"></div>
       </div>
+      <div data-pane="tool">
+        <div class="label">Orientation (tool z axis = approach)</div>
+        <div class="seg wrap" id="toolSeg"><button data-t="down" class="on">Down −z</button><button data-t="up">Up +z</button><button data-t="fwd">Forward +x</button><button data-t="side">Side +y</button><button data-t="tilt">Down, tilted 45°</button><button data-t="custom">Custom</button></div>
+        <div id="rpy" style="margin-top:8px">
+          <label class="slider wide"><span>roll (°)</span><input type="range" min="-180" max="180" step="1" data-k="0"><output></output></label>
+          <label class="slider wide"><span>pitch (°)</span><input type="range" min="-180" max="180" step="1" data-k="1"><output></output></label>
+          <label class="slider wide"><span>yaw (°)</span><input type="range" min="-180" max="180" step="1" data-k="2"><output></output></label>
+        </div>
+        <p class="note">R = R<sub>z</sub>(yaw) R<sub>y</sub>(pitch) R<sub>x</sub>(roll), the same for every point of the plane.</p>
+        <div class="label">Tool length (TCP offset along tool z)</div>
+        <label class="slider wide"><span>length</span><input type="range" id="len" min="0" max="0.30" step="0.01" value="0"><output id="lenOut">0.00 m</output></label>
+        <p class="note">The map point is the TCP; the flange (tool0) sits ℓ behind it along the tool axis. det J does not depend on the reference point.</p>
+        <div class="card" style="margin-top:10px"><p class="sub" id="toolNote"></p></div>
+      </div>
       <div data-pane="red">
         <div class="card"><h3>Why the tool axis is vertical</h3><p class="sub">With \(z_6 = \mp\hat z\), turning the base by \(q_1\) only spins the tool about its own (vertical) axis, which \(q_6\) undoes. So the IK count and the singularities depend only on \(\rho = \sqrt{x^2+y^2}\) and \(z\): the same axisymmetry the lecture uses for its 3R atlas. (For a tilted tool this symmetry is lost; use the task-space plane view for that.)</p></div>
         <div class="card"><h3>Four sheets</h3><p class="sub">The tool axis is \(z_6 = z_5\), and \(z_5\) is always perpendicular to axis 5 (\(z_4\)). So \(z_6 = v\) needs \(v \perp z_4\). With \(q_1 = 0\), \(z_4 = (\sin q_4 \sin s,\ \cos q_4,\ \sin q_4 \cos s)\), \(s = q_2 + q_3\), hence \(v\cdot z_4 = \mp\sin q_4\cos s = 0\). The solutions form four 2-D sheets: <b>A</b> \(q_4 = 0\) and <b>B</b> \(q_4 = 180^\circ\) (plotted over \(q_2, q_3\)); <b>U</b> forearm up, \(s = -90^\circ\), and <b>D</b> forearm down, \(s = +90^\circ\) (plotted over \(q_2, q_4\); there \(q_5 \in \{0, 180^\circ\}\), axes 4 and 6 parallel). On each sheet \(q_5\) is unique and \(q_6\) absorbs \(q_1\). Sheets meet along lines (A ∩ U is \(q_4 = 0,\ s = -90^\circ\), and so on). Every solver solution was checked to lie on one sheet.</p></div>
         <div class="card"><h3>Planes</h3><p class="sub">Because the count depends only on \((\rho, z)\), the critical set in 3-D is the critical curves rotated about the base axis. A plane cuts those surfaces exactly: on <b>xy</b> at height \(h\) they become circles of radius \(\rho\) wherever a critical curve crosses \(z = h\); on <b>xz</b> at \(y = c\) (or <b>yz</b> at \(x = c\)) each critical point maps to \(x = \pm\sqrt{\rho^2 - c^2}\). Region counts on a plane are full IK solves at a point of each region.</p></div>
+        <div class="card"><h3>Any tool</h3><p class="sub">If the tool axis is not vertical, a base rotation also tilts the tool, so the count depends on the full position and the (ρ, z) picture does not exist. The page then solves the chosen plane point by point (in web workers): every pixel gets its IK count, boundaries where the count changes are drawn as the critical curves, and every solution is plotted at its \((q_2, q_3)\) on one of the two wrist sheets (sign of \(q_5\); the 4-5-6 wrist has exactly two solutions for a given orientation), coloured by det J. Dark points (det J ≈ 0) trace the singular configurations whose images are the boundaries. A yaw-only change keeps the axis vertical and stays exact.</p></div>
         <div class="card"><h3>Singular set</h3><p class="sub">\(D = \det J\) of the full 6×6 Jacobian (it does not depend on \(q_1\) or \(q_6\)), evaluated on each sheet. Its zero curves are the singular configurations; their images are the critical curves. Every preimage of a target on either sheet is one full IK solution, checked against the solver: up to 16 for general orientations, here up to the count shown in each region.</p></div>
         <div class="card"><h3>Joint limits</h3><p class="sub">q₁, q₂, q₄, q₅ have a full turn and q₆ more, so only q₃ removes configurations: q₃ ∈ (85°, 135°) (mod 360°) is outside [−225°, 85°]. With “Joint limits” on, that band is hatched (a horizontal band on A and B, a vertical band in q₂ on U and D, since q₃ = s − q₂ there) and counts only use feasible solutions.</p></div>
       </div>

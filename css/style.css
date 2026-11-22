@@ -265,3 +265,7 @@ table.starts tr.sel td { background: #e9fbff; }
 .view-tools .offset[hidden] { display: none; }
 .view-tools .offset input { width: 120px; }
 .view-tools .offset output { font-variant-numeric: tabular-nums; min-width: 52px; }
+.quad.two { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+.quad.two #sU, .quad.two #sD { display: none; }
+.view-tools button:disabled { opacity: .4; cursor: not-allowed; }
+@media (max-width: 980px) { .quad.two { grid-template-columns: 1fr 1fr; grid-template-rows: auto; } }

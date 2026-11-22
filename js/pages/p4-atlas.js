@@ -3,7 +3,8 @@
 import { mountChrome, mountTabs, renderMath, $, $$ } from '../ui.js';
 import { RobotViewer, THREE } from '../viewer.js';
 import { buildGofaAtlas, solvePoint, sheetConfig, meridianOf, wrap, Q3_FORBIDDEN, APPROACH } from '../gofa-atlas.js';
-import { fmt } from '../math.js';
+import { fmt, rpy, rad } from '../math.js';
+import { solveTool } from '../tool-atlas.js';
 
 mountChrome();
 mountTabs();
@@ -13,7 +14,18 @@ const IK_COLORS = ['#c62828', '#1f5fa8', '#2e7d32', '#7b3fa0', '#e8590c', '#0083
 const SHEET_COLORS = { A: '#141414', B: '#1f5fa8', U: '#1f8a4c', D: '#e8590c' };
 const COUNT_FILL = ['#ffffff', '#f6f8fc', '#eef3fb', '#e6eefa', '#dde8f8', '#d3e2f7', '#c9dbf5', '#bfd4f3', '#b5cdf1', '#abc6ef', '#a1bfed', '#97b8eb', '#8db1e9', '#83aae7', '#79a3e5', '#6f9ce3', '#6595e1'];
 // target is a 3-D tool point p = [x, y, z]; the workspace view is the meridian (ρ, z) or a Cartesian plane
-const state = { ap: 'down', A: null, target: null, sols: [], sel: 0, limits: false, regions: true, regionData: null, plane: 'rz', offset: { xy: 0.35, xz: 0, yz: 0.3 } };
+const state = { ap: 'down', A: null, target: null, sols: [], sel: 0, limits: false, regions: true, regionData: null, plane: 'rz', offset: { xy: 0.35, xz: 0, yz: 0.3 },
+  tool: { key: 'down', rpy: [0, 180, 0], len: 0 }, num: null };
+// ---------------------------------------------------------------- tool
+// Orientation R = Rz(yaw) Ry(pitch) Rx(roll) and length ℓ along the tool z axis (TCP = tool0 + ℓ z6).
+// A vertical tool axis keeps the exact (ρ, z) atlas; any other orientation switches to the numerical map.
+const TOOLS = { down: [0, 180, 0], up: [0, 0, 0], fwd: [0, 90, 0], side: [-90, 0, 0], tilt: [0, 135, 0] };
+const toolR = () => rpy(state.tool.rpy.map(rad));
+function toolAxis() { const R = toolR(); return [R[0][2], R[1][2], R[2][2]]; }
+function vertical() { const z = toolAxis(); return Math.abs(Math.abs(z[2]) - 1) < 1e-9 ? (z[2] < 0 ? 'down' : 'up') : null; }
+const exact = () => !!vertical();
+const dzTool = () => state.tool.len * (state.ap === 'down' ? -1 : 1); // TCP height minus tool0 height (exact mode)
+const NUM_COLORS = { '+': '#141414', '−': '#1f5fa8' };
 const AXN = ['x', 'y', 'z'];
 const deg = (x) => ((x * 180) / PI).toFixed(1);
 const shown = () => (state.limits ? state.sols.filter((s) => s.within) : state.sols);
@@ -31,7 +43,8 @@ function showRobot() {
   if (!robotReady) return;
   viewer.setRobotVisible(!!s);
   if (s) viewer.setQ(s.q);
-  $('#robotCap').textContent = s ? `IK ${state.sel + 1} · sheet ${s.id} · ${s.within ? 'within limits' : 'violates q₃ limit'}` : 'no solution';
+  if (s && state.tool.len > 0) { const z = toolAxis(), t = state.target; viewer.addArrow([t[0] - state.tool.len * z[0], t[1] - state.tool.len * z[1], t[2] - state.tool.len * z[2]], z, { color: 0xd4a017, scale: state.tool.len, radius: 0.006 }); }
+  $('#robotCap').textContent = s ? `IK ${state.sel + 1} · ${exact() ? `sheet ${s.id}` : `wrist q₅ ${s.id === '+' ? '≥' : '<'} 0`} · ${s.within ? 'within limits' : 'violates q₃ limit'}` : 'no solution';
 }
 
 // the working plane as a translucent quad in the 3-D view
@@ -48,7 +61,8 @@ function drawPlane3D() {
 // ---------------------------------------------------------------- planes
 // u, v: plot axes; to3D maps them to the tool point; rz gives the meridian coordinates (ρ, z)
 function planeDef() {
-  const b = state.A.bounds, R = b.rhoMax * 1.06, dz = b.zMax - b.zMin, Z = [b.zMin - 0.05 * dz, b.zMax + 0.05 * dz];
+  const b = state.A.bounds, L = exact() ? 0 : state.tool.len, R = b.rhoMax * 1.06 + L, dz = b.zMax - b.zMin, sh = exact() ? dzTool() : 0;
+  const Z = [b.zMin - 0.05 * dz + sh - L, b.zMax + 0.05 * dz + sh + L];
   const h = state.offset[state.plane];
   switch (state.plane) {
     case 'xy': return { uName: 'x', vName: 'y', uR: [-R, R], vR: [-R, R], to3D: (u, v) => [u, v, h], rz: (u, v) => [Math.hypot(u, v), h], from3D: (p) => [p[0], p[1]], n: 2, h };
@@ -62,7 +76,8 @@ function planeCurves(sh, P) {
   const out = [];
   const pieces = sh.images.map((c, ci) => { // split where the joint-space polyline wraps around
     const qc = sh.curves[ci], segs = [[]];
-    c.forEach((pt, i) => { if (i && (Math.abs(qc[i][0] - qc[i - 1][0]) > 0.5 || Math.abs(qc[i][1] - qc[i - 1][1]) > 0.5)) segs.push([]); segs[segs.length - 1].push(pt); });
+    const dz = dzTool();
+    c.forEach((pt, i) => { if (i && (Math.abs(qc[i][0] - qc[i - 1][0]) > 0.5 || Math.abs(qc[i][1] - qc[i - 1][1]) > 0.5)) segs.push([]); segs[segs.length - 1].push([pt[0], pt[1] + dz]); });
     return segs;
   }).flat().filter((x) => x.length > 1);
   if (state.plane === 'rz') return pieces;
@@ -103,16 +118,22 @@ function rebuild() {
   solve();
 }
 function solve() {
-  state.sols = solvePoint(state.ap, state.target).sort((a, b) => a.id.localeCompare(b.id) || a.a - b.a);
+  if (exact()) {
+    const t = state.target;
+    state.sols = solvePoint(state.ap, [t[0], t[1], t[2] - dzTool()]).sort((a, b) => a.id.localeCompare(b.id) || a.a - b.a);
+  } else {
+    state.sols = solveTool(toolR(), state.tool.len, state.target).map((x) => ({ ...x, id: x.w > 0 ? '+' : '−', a: wrap(x.q[1]), b: wrap(x.q[2]) }))
+      .sort((a, b) => b.w - a.w || a.a - b.a);
+  }
   const list = shown();
   state.sel = Math.min(state.sel, Math.max(0, list.length - 1));
   const [x, y, z] = state.target, rho = Math.hypot(x, y);
   $('#ikTiles').innerHTML = [['tool point (m)', `${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}`], ['ρ (m)', rho.toFixed(3)], ['IK solutions', state.limits ? `${list.length} in limits / ${state.sols.length}` : state.sols.length]]
     .map(([k, x]) => `<div class="tile"><small>${k}</small><b>${x}</b></div>`).join('');
-  $('#ikChips').innerHTML = list.map((s, i) => `<button class="chip ${i === state.sel ? 'on' : ''}" data-i="${i}" style="color:${IK_COLORS[i % 16]};${i === state.sel ? `background:${IK_COLORS[i % 16]}` : ''}">IK ${i + 1}</button>`).join('') || '<span class="note">No solution: the target is outside the workspace for a vertical tool.</span>';
+  $('#ikChips').innerHTML = list.map((s, i) => `<button class="chip ${i === state.sel ? 'on' : ''}" data-i="${i}" style="color:${IK_COLORS[i % 16]};${i === state.sel ? `background:${IK_COLORS[i % 16]}` : ''}">IK ${i + 1}</button>`).join('') || '<span class="note">No solution: the target is outside the workspace for this tool.</span>';
   $$('#ikChips .chip').forEach((c) => (c.onclick = () => { state.sel = Number(c.dataset.i); solve(); }));
   $('#ikTable').innerHTML = list.length ? `<table class="starts"><thead><tr><th>IK</th><th>sheet</th>${[1, 2, 3, 4, 5, 6].map((i) => `<th>q${'₁₂₃₄₅₆'[i - 1]}</th>`).join('')}<th>det J</th></tr></thead><tbody>${
-    list.map((s, i) => `<tr class="${i === state.sel ? 'sel' : ''} ${s.within ? '' : 'out'}"><td><span class="dot" style="background:${IK_COLORS[i % 16]}"></span>${i + 1}</td><td><span class="dot" style="background:${SHEET_COLORS[s.id]}"></span>${s.id}</td>${s.q.map((x) => `<td>${deg(x)}</td>`).join('')}<td>${fmt(s.det, 3)}</td></tr>`).join('')
+    list.map((s, i) => `<tr class="${i === state.sel ? 'sel' : ''} ${s.within ? '' : 'out'}"><td><span class="dot" style="background:${IK_COLORS[i % 16]}"></span>${i + 1}</td><td><span class="dot" style="background:${SHEET_COLORS[s.id] || NUM_COLORS[s.id]}"></span>${exact() ? s.id : `q₅ ${s.id === '+' ? '≥' : '<'} 0`}</td>${s.q.map((x) => `<td>${deg(x)}</td>`).join('')}<td>${fmt(s.det, 3)}</td></tr>`).join('')
   }</tbody></table>` : '';
   paintAll(); showRobot(); legend();
 }
@@ -243,7 +264,7 @@ function computeRegions(F) {
       if (score > bs) { bs = score; best = t; }
     }
     const u = F.r0 + (best % RW) / k / F.sc, v = F.z0 + (F.h - ((best / RW) | 0) / k) / F.sc;
-    const sols = solvePoint(state.ap, F.P.to3D(u, v));
+    const p3 = F.P.to3D(u, v), sols = solvePoint(state.ap, [p3[0], p3[1], p3[2] - dzTool()]);
     R.all = sols.length; R.within = sols.filter((s) => s.within).length; R.at = [u, v];
   });
   return { RW, RH, lab, regions };
@@ -252,7 +273,7 @@ function paintW() {
   const cv = $('#wc'), { ctx, W, H } = setup(cv), F = wFrame(W, H); gw = F;
   const cnt = (R) => (R.all === null || R.all === undefined ? null : state.limits ? R.within : R.all);
   if (state.regions) {
-    const key = `${state.ap}:${state.plane}:${F.P.h}:${Math.round(F.w)}x${Math.round(F.h)}`;
+    const key = `${state.ap}:${state.tool.len}:${state.plane}:${F.P.h}:${Math.round(F.w)}x${Math.round(F.h)}`;
     if (!state.regionData || state.regionData.key !== key) state.regionData = { key, ...computeRegions(F) };
     const R = state.regionData, img = ctx.createImageData(R.RW, R.RH);
     for (let s = 0; s < R.RW * R.RH; s++) {
@@ -276,7 +297,7 @@ function paintW() {
     });
     ctx.textAlign = 'left';
   }
-  if (state.plane === 'rz') state.A.sheets.forEach((sh) => sh.cusps.forEach((c) => diamond(ctx, F.X(c.image[0]), F.Y(c.image[1]))));
+  if (state.plane === 'rz') state.A.sheets.forEach((sh) => sh.cusps.forEach((c) => diamond(ctx, F.X(c.image[0]), F.Y(c.image[1] + dzTool()))));
   // base axis
   ctx.setLineDash([5, 4]); ctx.strokeStyle = 'rgba(20,20,20,.5)'; ctx.lineWidth = 1;
   if (state.plane === 'xy') { ctx.beginPath(); ctx.arc(F.X(0), F.Y(0), 3, 0, 2 * PI); ctx.stroke(); }
@@ -308,7 +329,7 @@ function syncPlaneUI() {
   box.hidden = state.plane === 'rz';
   if (state.plane === 'rz' || !state.A) return;
   const P = planeDef(), b = state.A.bounds, R = b.rhoMax;
-  const range = state.plane === 'xy' ? [b.zMin, b.zMax] : [-R, R];
+  const L = state.tool.len, range = state.plane === 'xy' ? [b.zMin - L, b.zMax + L] : [-R - L, R + L];
   const inp = $('#off'); inp.min = range[0].toFixed(2); inp.max = range[1].toFixed(2); inp.value = state.offset[state.plane];
   $('#offName').textContent = `${AXN[P.n]} =`; $('#offOut').textContent = `${Number(inp.value).toFixed(2)} m`;
 }
@@ -317,14 +338,182 @@ function moveTargetOntoPlane() {
   if (state.plane === 'rz') { state.target = [Math.hypot(state.target[0], state.target[1]), 0, state.target[2]]; return; }
   const P = planeDef(); state.target = state.target.slice(); state.target[P.n] = P.h;
 }
-$$('#planeBtns button').forEach((b) => (b.onclick = () => { state.plane = b.dataset.pl; state.regionData = null; syncPlaneUI(); moveTargetOntoPlane(); solve(); }));
+$$('#planeBtns button').forEach((b) => (b.onclick = () => { if (b.disabled) return; state.plane = b.dataset.pl; state.regionData = null; syncPlaneUI(); moveTargetOntoPlane(); solve(); }));
 $('#off').oninput = (e) => { state.offset[state.plane] = Number(e.target.value); $('#offOut').textContent = `${state.offset[state.plane].toFixed(2)} m`; showRobot(); };
 $('#off').onchange = () => { state.regionData = null; moveTargetOntoPlane(); solve(); };
 
-function paintAll() { if (!state.A) return; state.A.sheets.forEach((sh) => paintSheet(`#s${sh.id}`, sh)); paintW(); }
+function paintAll() {
+  if (!state.A) return;
+  $('.quad').classList.toggle('two', !exact());
+  $('#qTitle').textContent = exact() ? 'Joint space · four sheets' : 'Joint space · footprint of the plane';
+  $('#qSub').textContent = exact() ? 'det J on each sheet, zero set in black' : 'every IK solution of the plane at (q₂, q₃), coloured by det J';
+  if (exact()) { state.A.sheets.forEach((sh) => paintSheet(`#s${sh.id}`, sh)); paintW(); }
+  else { paintWristNum('#sA', 1); paintWristNum('#sB', -1); paintWNum(); }
+}
 function legend() {
+  if (!exact()) return legendNum();
   const [x, y, z] = state.target, r = Math.hypot(x, y), nc = state.A.sheets.reduce((a, s) => a + s.cusps.length, 0);
-  $('#legend').innerHTML = `<span><b>${APPROACH[state.ap].name}</b></span><span>critical curves of sheet ${state.A.sheets.map((sh) => `<span class="dot" style="background:${SHEET_COLORS[sh.id]}"></span>${sh.id}`).join(' ')}</span><span><span class="dot" style="background:#ff0000"></span>cusp (${nc} found)</span><span>◎ (${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}) m · ρ = ${r.toFixed(3)} m</span><span><b>${shown().length} IK solutions</b>${state.limits ? ' within limits' : ''}</span>${state.regions ? '<span>numbers: IK count per region</span>' : ''}`;
+  $('#legend').innerHTML = `<span><b>${APPROACH[state.ap].name}${state.tool.len ? ` · ℓ = ${state.tool.len.toFixed(2)} m` : ''}</b></span><span>critical curves of sheet ${state.A.sheets.map((sh) => `<span class="dot" style="background:${SHEET_COLORS[sh.id]}"></span>${sh.id}`).join(' ')}</span><span><span class="dot" style="background:#ff0000"></span>cusp (${nc} found)</span><span>◎ (${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}) m · ρ = ${r.toFixed(3)} m</span><span><b>${shown().length} IK solutions</b>${state.limits ? ' within limits' : ''}</span>${state.regions ? '<span>numbers: IK count per region</span>' : ''}`;
+}
+
+// ---------------------------------------------------------------- numerical mode (tool axis not vertical)
+// Plane grid solved point by point in web workers: IK count per pixel, and every solution's (q2, q3),
+// wrist sign and det J for the joint-space footprint.
+let workers = [];
+function planeGrid() {
+  const P = planeDef(), res = window.matchMedia('(max-width: 980px)').matches ? 70 : 90;
+  const step = (P.uR[1] - P.uR[0]) / res, nv = Math.round((P.vR[1] - P.vR[0]) / step);
+  const ui = { xy: 0, xz: 0, yz: 1 }[state.plane], vi = { xy: 1, xz: 2, yz: 2 }[state.plane];
+  return { u0: P.uR[0], v0: P.vR[0], step, nu: res, nv, ui, vi, n: P.n, h: P.h };
+}
+function computeNum() {
+  const G = planeGrid(), key = JSON.stringify([state.tool, state.plane, G.h, G.nu]);
+  if (state.num?.key === key) return;
+  workers.forEach((w) => w.terminate());
+  const n = Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 4) - 1));
+  const num = { key, G, all: new Uint8Array(G.nu * G.nv), inl: new Uint8Array(G.nu * G.nv), sols: [], rows: 0, dMax: 1e-9, done: false };
+  state.num = num;
+  $('#progress').hidden = false; $('#progress').textContent = 'Solving IK on the plane…';
+  let last = 0;
+  const onRow = (r) => {
+    if (state.num !== num) return;
+    num.all.set(r.all, r.j * G.nu); num.inl.set(r.inl, r.j * G.nu); num.sols.push(r.sols);
+    for (let k = 4; k < r.sols.length; k += 6) num.dMax = Math.max(num.dMax, Math.abs(r.sols[k]));
+    num.rows++;
+    $('#progress').textContent = `Solving IK on the plane ${Math.round((100 * num.rows) / G.nv)}%`;
+    if (num.rows === G.nv) { num.done = true; $('#progress').hidden = true; paintAll(); }
+    else if (performance.now() - last > 300) { last = performance.now(); paintAll(); }
+  };
+  try {
+    workers = Array.from({ length: n }, () => new Worker(new URL('../atlas-worker.js', import.meta.url), { type: 'module' }));
+    const R = toolR();
+    workers.forEach((w, wi) => {
+      w.onmessage = (e) => { if (!e.data.done) onRow(e.data); };
+      const rows = []; for (let j = wi; j < G.nv; j += n) rows.push(j);
+      w.postMessage({ R, len: state.tool.len, G, rows });
+    });
+  } catch (err) { console.error(err); }
+}
+function paintWNum() {
+  computeNum();
+  const cv = $('#wc'), { ctx, W, H } = setup(cv), F = wFrame(W, H); gw = F;
+  const N = state.num, G = N.G, cnt = state.limits ? N.inl : N.all, px = G.step * F.sc;
+  const X = (i) => F.x0 + i * px, Y = (j) => F.y0 + F.h - (j + 1) * px;
+  const filled = (k) => Math.floor(k / G.nu) < N.rows || N.done;
+  for (let j = 0; j < G.nv; j++) for (let i = 0; i < G.nu; i++) {
+    const k = j * G.nu + i;
+    ctx.fillStyle = state.regions ? COUNT_FILL[Math.min(cnt[k], 16)] : '#f7f9fc';
+    ctx.fillRect(X(i), Y(j), px + 0.6, px + 0.6);
+  }
+  // critical curves ≈ where the IK count changes between neighbouring points
+  ctx.strokeStyle = '#141414'; ctx.lineWidth = 1.3; ctx.beginPath();
+  for (let j = 0; j < G.nv; j++) for (let i = 0; i < G.nu; i++) {
+    const k = j * G.nu + i;
+    if (i + 1 < G.nu && N.all[k] !== N.all[k + 1]) { ctx.moveTo(X(i + 1), Y(j)); ctx.lineTo(X(i + 1), Y(j) + px); }
+    if (j + 1 < G.nv && N.all[k] !== N.all[k + G.nu]) { ctx.moveTo(X(i), Y(j)); ctx.lineTo(X(i) + px, Y(j)); }
+  }
+  ctx.stroke();
+  // labels: one per connected region of equal count, at its deepest pixel
+  if (state.regions && N.done) {
+    const lab = new Int32Array(G.nu * G.nv).fill(-1);
+    ctx.font = '600 11px Inter, Arial'; ctx.textAlign = 'center';
+    for (let s0 = 0; s0 < lab.length; s0++) {
+      if (lab[s0] >= 0) continue;
+      const stack = [s0], pix = []; lab[s0] = s0;
+      while (stack.length) {
+        const t = stack.pop(); pix.push(t);
+        const x = t % G.nu, y = (t / G.nu) | 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= G.nu || ny >= G.nv) continue;
+          const u = ny * G.nu + nx; if (lab[u] < 0 && cnt[u] === cnt[s0]) { lab[u] = s0; stack.push(u); }
+        }
+      }
+      if (pix.length < 40) continue;
+      let best = pix[0], bd = -1;
+      for (const t of pix) {
+        const x = t % G.nu, y = (t / G.nu) | 0; let d = 0;
+        while (d < 10 && [[x + d + 1, y], [x - d - 1, y], [x, y + d + 1], [x, y - d - 1]].every(([a, b]) => a >= 0 && b >= 0 && a < G.nu && b < G.nv && cnt[b * G.nu + a] === cnt[s0])) d++;
+        if (d > bd) { bd = d; best = t; }
+      }
+      ctx.fillStyle = cnt[s0] ? '#1f3f73' : '#9a9a9a';
+      ctx.fillText(String(cnt[s0]), X(best % G.nu) + px / 2, Y((best / G.nu) | 0) + px / 2 + 4);
+    }
+    ctx.textAlign = 'left';
+  }
+  const st = niceStep((F.r1 - F.r0) / 5), ticks = (a, b) => { const o = []; for (let t = Math.ceil(a / st) * st; t <= b + 1e-9; t += st) o.push(+t.toFixed(6)); return o; };
+  ctx.setLineDash([5, 4]); ctx.strokeStyle = 'rgba(20,20,20,.5)'; ctx.lineWidth = 1;
+  if (state.plane === 'xy') { ctx.beginPath(); ctx.arc(F.X(0), F.Y(0), 3, 0, 2 * PI); ctx.stroke(); }
+  else if (Math.abs(F.P.h) < 1e-9) { ctx.beginPath(); ctx.moveTo(F.X(0), F.y0); ctx.lineTo(F.X(0), F.y0 + F.h); ctx.stroke(); }
+  ctx.setLineDash([]);
+  const [tu, tv] = F.P.from3D(state.target);
+  ctx.beginPath(); ctx.arc(F.X(tu), F.Y(tv), 7, 0, 2 * PI); ctx.lineWidth = 2; ctx.strokeStyle = '#141414'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(F.X(tu), F.Y(tv), 2.5, 0, 2 * PI); ctx.fillStyle = '#141414'; ctx.fill();
+  ctx.lineWidth = 1; ctx.strokeRect(F.x0, F.y0, F.w, F.h);
+  ctx.fillStyle = '#141414'; ctx.font = '10.5px Inter, Arial'; ctx.textAlign = 'center';
+  ticks(F.r0, F.r1).forEach((r) => ctx.fillText(+r.toFixed(3) + '', F.X(r), F.y0 + F.h + 13));
+  ctx.fillText(`${F.P.uName} [m]`, F.x0 + F.w / 2, F.y0 + F.h + 27);
+  ctx.textAlign = 'right';
+  ticks(F.z0, F.z1).forEach((z) => ctx.fillText(+z.toFixed(3) + '', F.x0 - 4, F.Y(z) + 3));
+  ctx.save(); ctx.translate(10, F.y0 + F.h / 2); ctx.rotate(-PI / 2); ctx.textAlign = 'center'; ctx.fillText(`${F.P.vName} [m]`, 0, 0); ctx.restore(); ctx.textAlign = 'left';
+  $('#wTitle').textContent = `Plane ${state.plane} at ${AXN[F.P.n]} = ${F.P.h.toFixed(2)} m`;
+  $('#wSub').textContent = `numerical · ${G.nu} × ${G.nv} points · boundaries = count changes`;
+}
+// Joint-space footprint of the plane: every IK solution of every plane point, at its (q2, q3),
+// coloured by det J; near-singular points are dark, so the singular curves show as dark lines.
+function paintWristNum(id, w) {
+  const cv = $(id), { ctx, W, H } = setup(cv);
+  const PAD = { l: 34, r: 24, t: 16, b: 28 };
+  const S = Math.min(W - PAD.l - PAD.r, H - PAD.t - PAD.b), x0 = PAD.l + (W - PAD.l - PAD.r - S) / 2, y0 = PAD.t + (H - PAD.t - PAD.b - S) / 2;
+  const X = (q2) => x0 + ((wrap(q2) + PI) / (2 * PI)) * S, Y = (q3) => y0 + S - ((wrap(q3) + PI) / (2 * PI)) * S;
+  geo[id] = { X, Y, x0, y0, S, w };
+  ctx.fillStyle = '#fafafa'; ctx.fillRect(x0, y0, S, S);
+  const N = state.num;
+  if (N) {
+    const sz = Math.max(1.6, (S / 2 / PI) * N.G.step * 2.2);
+    for (const arr of N.sols) for (let k = 0; k < arr.length; k += 6) {
+      if (arr[k + 3] !== w || (state.limits && !arr[k + 5])) continue;
+      const t = arr[k + 4] / N.dMax, near = Math.abs(t) < 0.03;
+      const c = near ? [20, 20, 20] : diverging(t * 1.6);
+      ctx.fillStyle = `rgb(${c.map(Math.round).join(',')})`;
+      ctx.fillRect(X(arr[k + 1]) - sz / 2, Y(arr[k + 2]) - sz / 2, sz, sz);
+    }
+  }
+  if (state.limits) {
+    const ya = Y(Q3_FORBIDDEN[1]), yb = Y(Q3_FORBIDDEN[0]);
+    ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(x0, ya, S, yb - ya);
+  }
+  shown().forEach((s, i) => { if (s.w === w) marker(ctx, X(s.q[1]), Y(s.q[2]), i, i === state.sel, false); });
+  ctx.strokeStyle = NUM_COLORS[w > 0 ? '+' : '−']; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, S, S);
+  ctx.fillStyle = NUM_COLORS[w > 0 ? '+' : '−']; ctx.font = '600 10.5px Inter, Arial';
+  ctx.fillText(`Wrist q₅ ${w > 0 ? '≥' : '<'} 0 · footprint of the plane`, x0, y0 - 5);
+  ctx.font = '9px Inter, Arial'; ctx.fillStyle = '#141414';
+  const labels = [[-PI, '−π'], [0, '0'], [PI, 'π']];
+  ctx.textAlign = 'center'; labels.forEach(([v, t]) => ctx.fillText(t, X(v === PI ? PI - 1e-9 : v), y0 + S + 12)); ctx.fillText('q₂', x0 + S / 2, y0 + S + 24);
+  ctx.textAlign = 'right'; labels.forEach(([v, t]) => ctx.fillText(t, x0 - 4, Y(v === PI ? PI - 1e-9 : v) + 3));
+  ctx.save(); ctx.translate(10, y0 + S / 2); ctx.rotate(-PI / 2); ctx.textAlign = 'center'; ctx.fillText('q₃', 0, 0); ctx.restore(); ctx.textAlign = 'left';
+}
+// Tap on a footprint: jump to the plane point whose solution is nearest
+function tapWristNum(g, x, y) {
+  const list = shown();
+  const hit = list.findIndex((s) => s.w === g.w && Math.hypot(g.X(s.q[1]) - x, g.Y(s.q[2]) - y) < 10);
+  if (hit >= 0) { state.sel = hit; solve(); return; }
+  const N = state.num; if (!N) return;
+  let best = null, bd = 64;
+  for (const arr of N.sols) for (let k = 0; k < arr.length; k += 6) {
+    if (arr[k + 3] !== g.w || (state.limits && !arr[k + 5])) continue;
+    const d = (g.X(arr[k + 1]) - x) ** 2 + (g.Y(arr[k + 2]) - y) ** 2;
+    if (d < bd) { bd = d; best = [arr[k], arr[k + 1], arr[k + 2]]; }
+  }
+  if (!best) return;
+  const G = N.G, i = best[0] % G.nu, j = Math.floor(best[0] / G.nu), p = [0, 0, 0];
+  p[G.ui] = G.u0 + (i + 0.5) * G.step; p[G.vi] = G.v0 + (j + 0.5) * G.step; p[G.n] = G.h;
+  state.target = p; solve();
+  const near = shown().findIndex((s) => s.w === g.w && Math.abs(wrap(s.q[1] - best[1])) < 1e-6 && Math.abs(wrap(s.q[2] - best[2])) < 1e-6);
+  if (near >= 0) { state.sel = near; solve(); }
+}
+function legendNum() {
+  const [x, y, z] = state.target;
+  $('#legend').innerHTML = `<span><b>Tool rpy (${state.tool.rpy.join('°, ')}°) · ℓ = ${state.tool.len.toFixed(2)} m</b></span><span>numbers: IK count per region · black lines: count changes</span><span>left: plane’s IK solutions at (q₂, q₃), dark = det J ≈ 0</span><span>◎ (${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}) m · <b>${shown().length} IK solutions</b>${state.limits ? ' within limits' : ''}</span>`;
 }
 
 // ---------------------------------------------------------------- interaction
@@ -343,13 +532,14 @@ function pointWithRhoZ(r, z) {
 ['#sA', '#sB', '#sU', '#sD'].forEach((id) => $(id).addEventListener('pointerdown', (e) => {
   const g = geo[id]; if (!g) return;
   const r = e.target.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (!exact()) return tapWristNum(g, x, y);
   const list = shown();
   const hit = list.findIndex((s) => s.id === g.sheet.id && Math.hypot(g.X(s.a) - x, g.Y(s.b) - y) < 10);
   if (hit >= 0) { state.sel = hit; solve(); return; }
   if (x < g.x0 || y < g.y0 || x > g.x0 + g.S || y > g.y0 + g.S) return;
   const a = ((x - g.x0) / g.S) * 2 * PI - PI, b = ((g.y0 + g.S - y) / g.S) * 2 * PI - PI;
   const [rr, zz] = meridianOf(sheetConfig(g.sheet, a, b, state.A.v));
-  state.target = pointWithRhoZ(rr, zz);
+  state.target = pointWithRhoZ(rr, zz + dzTool());
   solve();
   const near = shown().findIndex((s) => s.id === g.sheet.id && Math.abs(wrap(s.a - a)) < 1e-3 && Math.abs(wrap(s.b - b)) < 1e-3);
   if (near >= 0) { state.sel = near; solve(); }
@@ -361,7 +551,30 @@ $('#wc').addEventListener('pointerdown', (e) => {
   state.target = gw.P.to3D(gw.r0 + (x - gw.x0) / gw.sc, gw.z0 + (gw.y0 + gw.h - y) / gw.sc);
   state.sel = 0; solve();
 });
-$$('#apBtns button').forEach((b) => (b.onclick = () => { state.ap = b.dataset.ap; $$('#apBtns button').forEach((x) => x.classList.toggle('on', x === b)); state.target = null; rebuild(); if (state.plane !== 'rz') { moveTargetOntoPlane(); solve(); } }));
+// tool controls (toolbar presets and the Tool tab)
+function setTool(changedOrientation) {
+  const v = vertical();
+  $$('#apBtns button, #toolSeg button').forEach((b) => b.classList.toggle('on', b.dataset.t === state.tool.key));
+  $$('#rpy input').forEach((inp, k) => { inp.value = state.tool.rpy[k]; inp.nextElementSibling.textContent = `${state.tool.rpy[k]}°`; });
+  $('#lenOut').textContent = `${state.tool.len.toFixed(2)} m`; $('#len').value = state.tool.len;
+  $('[data-pl="rz"]').disabled = !v;
+  $('#toolNote').innerHTML = v ? `Tool axis vertical (${v}): exact atlas, all four sheets.` : 'Tool axis not vertical: the (ρ, z) symmetry is lost, so the plane is solved point by point (numerical map) and joint space shows where the plane’s IK solutions land, split by wrist sign.';
+  state.regionData = null; state.num = null;
+  if (v && (v !== state.ap || !state.A)) { state.ap = v; state.A = buildGofaAtlas(v); }
+  if (!v && state.plane === 'rz') { state.plane = 'xz'; state.target = [state.target[0], state.offset.xz, state.target[2]]; }
+  syncPlaneUI(); moveTargetOntoPlane();
+  if (changedOrientation) state.sel = 0;
+  solve();
+}
+$$('#apBtns button, #toolSeg button').forEach((b) => (b.onclick = () => {
+  state.tool.key = b.dataset.t; if (TOOLS[b.dataset.t]) state.tool.rpy = TOOLS[b.dataset.t].slice(); setTool(true);
+}));
+$$('#rpy input').forEach((inp) => {
+  inp.oninput = () => { state.tool.rpy[Number(inp.dataset.k)] = Number(inp.value); inp.nextElementSibling.textContent = `${inp.value}°`; };
+  inp.onchange = () => { state.tool.key = Object.keys(TOOLS).find((k) => TOOLS[k].every((x, i) => x === state.tool.rpy[i])) || 'custom'; setTool(true); };
+});
+$('#len').oninput = (e) => { $('#lenOut').textContent = `${Number(e.target.value).toFixed(2)} m`; };
+$('#len').onchange = (e) => { state.tool.len = Number(e.target.value); setTool(false); };
 $('#limBtn').onclick = () => { state.limits = !state.limits; $('#limBtn').classList.toggle('on', state.limits); state.sel = 0; solve(); };
 $('#regBtn').onclick = () => { state.regions = !state.regions; $('#regBtn').classList.toggle('on', state.regions); paintAll(); legend(); };
 new ResizeObserver(() => paintAll()).observe($('#twin'));

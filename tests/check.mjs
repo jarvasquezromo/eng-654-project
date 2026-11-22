@@ -123,6 +123,26 @@ check(`JS IK round trip, fraction of q not recovered (${miss}/${NRT})`, miss / N
   check('Atlas: every IK solution lies on one of the four sheets (off-sheet)', off, 0);
 }
 
+// 5f. Any-tool atlas: TCP pose reproduced; for a vertical tool the counts equal the exact atlas (TCP shifted by ℓ)
+{
+  const { solveTool } = await import('../js/tool-atlas.js');
+  const { solvePoint } = await import('../js/gofa-atlas.js');
+  const { rpy } = await import('../js/math.js');
+  const R = rpy([0.3, 1.2, -0.4]), len = 0.12;
+  let eT = 0, diff = 0;
+  for (let n = 0; n < 30; n++) {
+    const p = [1.4 * Math.random() - 0.7, 1.4 * Math.random() - 0.7, 1.4 * Math.random() - 0.5];
+    for (const s of solveTool(R, len, p)) {
+      const F = poeFK(s.q);
+      eT = Math.max(eT, ...[0, 1, 2].map((i) => Math.abs(F[i][3] + len * F[i][2] - p[i])), ...[0, 1, 2].flatMap((i) => [0, 1, 2].map((j) => Math.abs(F[i][j] - R[i][j]))));
+    }
+    const Rd = rpy([0, Math.PI, 0]);
+    if (solveTool(Rd, len, p).length !== solvePoint('down', [p[0], p[1], p[2] + len]).length) diff++;
+  }
+  check('Any-tool atlas: TCP pose of every solution (tilted tool, ℓ = 0.12 m)', eT, 1e-7);
+  check('Any-tool atlas: vertical tool counts equal the exact atlas (mismatches)', diff, 0);
+}
+
 // 6. Reference configuration is regular
 const c = conditioning(toolJacobian(REFERENCE_Q));
 console.log(`INFO  reference q: sigma_min=${c.sigmaMin.toFixed(4)} kappa=${c.kappa.toFixed(2)} det=${c.det.toExponential(3)}`);
